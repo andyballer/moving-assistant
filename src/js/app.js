@@ -38,6 +38,59 @@ function playWelcomeAnimation() {
   sessionStorage.setItem('hasAnimated', 'true');
 }
 
+// --- CELEBRATIONS ---
+function spawnConfetti(big) {
+  const colors = ['#007aff', '#34c759', '#ff9500', '#ff3b30', '#eb6eaf'];
+  const count = big ? 100 : 45;
+  const layer = document.createElement('div');
+  layer.className = 'mt-confetti-layer';
+  for (let i = 0; i < count; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'mt-confetti-piece';
+    piece.style.left = Math.random() * 100 + 'vw';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.animationDelay = (Math.random() * 0.35) + 's';
+    piece.style.animationDuration = (1.8 + Math.random() * 1.2) + 's';
+    layer.appendChild(piece);
+  }
+  document.body.appendChild(layer);
+  setTimeout(() => layer.remove(), 3200);
+}
+
+function isPhaseComplete(phase) {
+  return phase.items.every((_, i) => !!state.checked[phase.id + '-' + i]);
+}
+
+function checkPhaseCelebration(key) {
+  const allPhases = [...AppEngine.TIMELINE_DATA_MATRIX, ...AppEngine.APT_PHASES];
+  const phase = allPhases.find(p => key.startsWith(p.id + '-'));
+  if (phase && isPhaseComplete(phase)) spawnConfetti(false);
+}
+
+function isAllDone() {
+  const total = totalTaskCount();
+  return total > 0 && doneTaskCount() === total;
+}
+
+function getFunStat() {
+  const donationCount = Object.values(state.donations).reduce((sum, arr) => sum + arr.length, 0);
+  const packedRooms = AppEngine.ROOMS.filter(r => state.rooms[r] === 'Packed').length;
+  const days = daysUntilMove();
+  if (packedRooms > 0 && packedRooms < AppEngine.ROOMS.length) {
+    return `${packedRooms} of ${AppEngine.ROOMS.length} rooms fully packed. Keep going!`;
+  }
+  if (packedRooms === AppEngine.ROOMS.length && AppEngine.ROOMS.length > 0) {
+    return `Every room packed. You are basically a moving professional now.`;
+  }
+  if (donationCount > 0) {
+    return `You've donated ${donationCount} item${donationCount === 1 ? '' : 's'} so far — future you says thanks.`;
+  }
+  if (days > 0 && days <= 7) {
+    return `${days} day${days === 1 ? '' : 's'} to go. This is the home stretch.`;
+  }
+  return `Every box you pack now is one less thing to think about on move day.`;
+}
+
 // --- HELPERS ---
 function totalTaskCount() {
   let count = AppEngine.TIMELINE_DATA_MATRIX.reduce((sum, p) => sum + p.items.length, 0);
@@ -111,7 +164,7 @@ function renderHeader() {
   return `
     <div class="mt-header">
       <div class="mt-title-area">
-        <h1>Relocation Workspace</h1>
+        <h1>The Big Move</h1>
         <p>Target Date: <span style="font-size: 15px; color: var(--accent-primary); font-weight:700;">${formattedMoveDate} (${weekday})</span></p>
       </div>
       <div class="mt-countdown ${urgencyClass}">
@@ -144,7 +197,7 @@ function renderSidebar() {
     <div class="mt-sidebar">
       <div class="mt-sidebar-top">
         <div class="mt-user-badge">
-          <div class="welcome">Space Layout • Size: ${state.aptSize.toUpperCase()}</div>
+          <div class="welcome">Packing for a ${state.aptSize.toUpperCase()}</div>
           <div class="username">${esc(state.userName || 'Andy')}</div>
         </div>
         <div class="mt-nav">
@@ -152,12 +205,12 @@ function renderSidebar() {
         </div>
       </div>
       <div>
-        <button class="mt-settings-trigger" id="mt-gear-settings">⚙️ Edit Profile Setup</button>
+        <button class="mt-settings-trigger" id="mt-gear-settings">⚙️ Edit Move Details</button>
         <button class="mt-settings-trigger" id="mt-export-backup">⬇️ Export Backup</button>
         <button class="mt-settings-trigger" id="mt-import-backup">⬆️ Import Backup</button>
         <input type="file" id="mt-import-file" accept="application/json" style="display:none;" />
         <div class="mt-sidebar-progress">
-          <div class="mt-progress-meta"><span>COMPLETION METRIC</span><span>${pct}% Done</span></div>
+          <div class="mt-progress-meta"><span>PROGRESS</span><span>${pct}% Done</span></div>
           <div class="mt-progress-track"><div class="mt-progress-fill" style="width:${pct}%"></div></div>
         </div>
       </div>
@@ -191,6 +244,10 @@ function renderDashboard() {
         <h3 style="margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; color: var(--text-muted);">Today's Focus</h3>
         <p style="font-size: 18px; font-weight: 600; margin-bottom: 5px;">${esc(focus.text)}</p>
         <p style="font-size: 12px; color: var(--accent-primary);">${esc(focus.phase)}</p>
+      </div>
+
+      <div class="mt-card" style="padding: 16px 20px; margin-top: 16px; background: rgba(0,122,255,0.05); border-color: rgba(0,122,255,0.15);">
+        <p style="margin: 0; font-size: 13.5px; font-weight: 600;">${esc(getFunStat())}</p>
       </div>
     </div>
   `;
@@ -265,13 +322,13 @@ function renderApartments() {
 
   return `
     <div class="mt-income-wrapper">
-      <label>Dynamic Gross Salary Scale ($):</label>
+      <label>Annual Income (for a rough budget check):</label>
       <input type="number" id="mt-income-input" value="${state.annualIncome || ''}" />
     </div>
     <div class="mt-apt-form">
       <input type="text" id="mt-apt-name" placeholder="Address / Building Name" />
       <input type="number" id="mt-apt-price" placeholder="Rent/mo" />
-      <button class="mt-wizard-btn" id="mt-apt-submit" style="width: auto;">Log Property</button>
+      <button class="mt-wizard-btn" id="mt-apt-submit" style="width: auto;">Add Apartment</button>
     </div>
     ${cards}
   `;
@@ -403,7 +460,7 @@ function renderAddressUtil() {
 
   return `
     <div class="mt-card">
-      <div class="mt-card-header"><h3>Address Profiling</h3></div>
+      <div class="mt-card-header"><h3>Update Your Address</h3></div>
       <div class="mt-card-body">
         ${AppEngine.ADDRESS_CHANGES.map((text, i) => {
           const key = 'addr-' + i;
@@ -450,11 +507,11 @@ function render() {
       <div class="mt-wizard-overlay">
         <div class="mt-wizard-card">
           <h2>📦 Welcome! Let's Get Your Move On</h2>
-          <p>Configure parameters to adjust custom tracking algorithms.</p>
-          <div class="mt-wizard-field"><label>Profile User Name</label><input type="text" id="wiz-name" value="${state.userName || 'Andy'}" /></div>
-          <div class="mt-wizard-field"><label>Target Relocation Date</label><input type="date" id="wiz-date" value="${state.targetMoveDate || '2026-09-01'}" /></div>
+          <p>Just the basics — we'll handle the rest.</p>
+          <div class="mt-wizard-field"><label>What should we call you?</label><input type="text" id="wiz-name" value="${state.userName || 'Andy'}" /></div>
+          <div class="mt-wizard-field"><label>When's moving day?</label><input type="date" id="wiz-date" value="${state.targetMoveDate || '2026-09-01'}" /></div>
           <div class="mt-wizard-field">
-            <label>Current Apartment Layout Size</label>
+            <label>How big's the place?</label>
             <select id="wiz-size">
               <option value="studio" ${state.aptSize === 'studio' ? 'selected' : ''}>Studio Layout</option>
               <option value="1br" ${state.aptSize === '1br' ? 'selected' : ''}>1-Bedroom Apartment</option>
@@ -462,7 +519,7 @@ function render() {
               <option value="3br" ${state.aptSize === '3br' ? 'selected' : ''}>3-Bedroom Apartment</option>
             </select>
           </div>
-          <button class="mt-wizard-btn" id="wiz-submit">Save Application Parameters</button>
+          <button class="mt-wizard-btn" id="wiz-submit">Let's Do This</button>
         </div>
       </div>
     `;
@@ -470,7 +527,7 @@ function render() {
       const name = document.getElementById('wiz-name').value.trim();
       const date = document.getElementById('wiz-date').value;
       const size = document.getElementById('wiz-size').value;
-      if (!name || !date) return alert('Values mandatory.');
+      if (!name || !date) return alert('Just need your name and move date to get started!');
       state.userName = name;
       state.targetMoveDate = date;
       state.aptSize = size;
@@ -561,8 +618,14 @@ function attachHandlers() {
   root.querySelectorAll('[data-check]').forEach(el => {
     el.addEventListener('click', () => {
       const key = el.getAttribute('data-check');
+      const turningOn = !state.checked[key];
+      const wasAllDone = isAllDone();
       state.checked[key] = !state.checked[key];
       AppEngine.saveState(state);
+      if (turningOn) {
+        checkPhaseCelebration(key);
+        if (isAllDone() && !wasAllDone) spawnConfetti(true);
+      }
       render();
     });
   });
@@ -589,8 +652,16 @@ function attachHandlers() {
 
   root.querySelectorAll('[data-room-status]').forEach(btn => {
     btn.addEventListener('click', () => {
-      state.rooms[btn.getAttribute('data-room')] = btn.getAttribute('data-room-status');
+      const room = btn.getAttribute('data-room');
+      const status = btn.getAttribute('data-room-status');
+      const wasAllDone = isAllDone();
+      const justPacked = status === 'Packed' && state.rooms[room] !== 'Packed';
+      state.rooms[room] = status;
       AppEngine.saveState(state);
+      if (justPacked) {
+        spawnConfetti(false);
+        if (isAllDone() && !wasAllDone) spawnConfetti(true);
+      }
       render();
     });
   });

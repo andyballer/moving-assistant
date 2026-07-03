@@ -136,7 +136,17 @@ body { margin: 0; font-family: 'Inter', sans-serif; background-color: var(--bg-a
 .btn-status-green { border-color: var(--accent-success) !important; color: var(--accent-success) !important; }
 .btn-status-green.active { background: var(--accent-success) !important; color: #fff !important; }
 
-/* ---- Instructional Note Boxes ---- */
+/* ---- Confetti ---- */
+.mt-confetti-layer { position: fixed; inset: 0; pointer-events: none; z-index: 20000; overflow: hidden; }
+.mt-confetti-piece {
+  position: absolute; top: -20px; width: 8px; height: 14px; opacity: 0.9;
+  border-radius: 2px; animation-name: mt-confetti-fall;
+  animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94); animation-fill-mode: forwards;
+}
+@keyframes mt-confetti-fall {
+  0% { top: -20px; transform: rotate(0deg); opacity: 1; }
+  100% { top: 105vh; transform: rotate(620deg); opacity: 0.4; }
+}
 .mt-alert-box { background: rgba(255, 149, 0, 0.08); border-left: 4px solid var(--accent-warning); padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; line-height: 1.5; }
 
 /* ---- Supply Counter Grid System ---- */
@@ -144,3 +154,34 @@ body { margin: 0; font-family: 'Inter', sans-serif; background-color: var(--bg-a
 .mt-supply-badge { background: rgba(0,122,255,0.05); border: 1px solid rgba(0,122,255,0.15); border-radius: 10px; padding: 12px; text-align: center; }
 .mt-supply-badge .count { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: var(--accent-primary); display: block; }
 .mt-supply-badge .label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
+/* ---- Responsive: phones/small screens ---- */
+@media (max-width: 768px) {
+  #move-tracker-root { flex-direction: column; height: 100vh; width: 100vw; }
+
+  .mt-sidebar {
+    width: 100%; height: auto; flex-direction: column;
+    padding-bottom: 0; flex-shrink: 0;
+  }
+  .mt-sidebar-top {
+    flex-direction: row; align-items: center; gap: 14px;
+    padding: 14px 16px; overflow-x: auto; flex: none;
+  }
+  .mt-user-badge { flex-shrink: 0; }
+  .mt-user-badge .username { font-size: 16px; }
+  .mt-nav { flex-direction: row; gap: 6px; }
+  .mt-nav button { white-space: nowrap; padding: 8px 12px; font-size: 12.5px; }
+
+  .mt-sidebar > div:last-child {
+    display: flex; flex-direction: row; align-items: center;
+    gap: 8px; padding: 0 16px 12px; overflow-x: auto;
+  }
+  .mt-settings-trigger { width: auto; white-space: nowrap; margin-bottom: 0; padding: 8px 12px; font-size: 12px; }
+  .mt-sidebar-progress { margin-top: 0; padding: 0; flex-shrink: 0; min-width: 120px; }
+
+  .mt-main-content { height: auto; flex: 1; overflow: hidden; }
+  .mt-header { padding: 16px 16px 14px; flex-wrap: wrap; gap: 10px; }
+  .mt-scroll-body { padding: 0 16px 32px; }
+
+  .mt-card-body { overflow-x: auto; }
+  .mt-apt-form, .mt-spend-form { flex-direction: column; align-items: stretch; }
+}
