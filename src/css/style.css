@@ -15,7 +15,6 @@
   --border-color: #e5e5ea;
 }
 
-/* Base Styles & Native Scrollbar */
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #d1d1d6; border-radius: 4px; }
@@ -23,9 +22,9 @@
 
 body { margin: 0; font-family: 'Inter', sans-serif; background-color: var(--bg-app); color: var(--text-main); -webkit-font-smoothing: antialiased; }
 
-#move-tracker-root { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
+#move-tracker-root { display: flex; height: 100vh; width: 100vw; overflow: hidden; position: relative; }
 
-/* ---- Layout ---- */
+/* ---- Layout Sidebar (Desktop) ---- */
 .mt-sidebar {
   width: 280px; background-color: var(--sidebar-bg);
   display: flex; flex-direction: column; height: 100vh;
@@ -36,7 +35,7 @@ body { margin: 0; font-family: 'Inter', sans-serif; background-color: var(--bg-a
 .mt-main-content { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 .mt-scroll-body { flex: 1; padding: 0 40px 40px; overflow-y: auto; }
 
-/* ---- Sidebar Components ---- */
+/* ---- Navigation Items ---- */
 .mt-user-badge { color: #fff; }
 .mt-user-badge .welcome { font-size: 11px; color: var(--sidebar-text); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 .mt-user-badge .username { font-size: 22px; font-weight: 700; margin-top: 4px; }
@@ -62,10 +61,51 @@ body { margin: 0; font-family: 'Inter', sans-serif; background-color: var(--bg-a
 .mt-progress-track { height: 6px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
 .mt-progress-fill { height: 100%; background: var(--accent-success); transition: width 0.3s ease; }
 
-/* ---- Header & Cards ---- */
+/* ---- Fixed Native Header Layout ---- */
 .mt-header { background: var(--bg-app); padding: 30px 40px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; flex-shrink: 0; }
+.mt-title-area { display: flex; align-items: center; gap: 15px; }
 .mt-title-area h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
 .mt-title-area p { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); }
+
+/* Mobile Hamburger Style Button */
+.mt-hamburger-btn { display: none; background: none; border: none; font-size: 28px; cursor: pointer; color: var(--text-main); padding: 5px; }
+
+/* ---- Mobile Menu Overlay Screen ---- */
+.mt-mobile-menu-overlay {
+  position: fixed; inset: 0; background: #ffffff; z-index: 9999;
+  display: flex; flex-direction: column; padding: 30px 20px; overflow-y: auto;
+}
+.mt-mobile-menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+.mt-mobile-menu-header h2 { margin: 0; font-size: 22px; font-weight: 700; }
+.mt-mobile-menu-close { background: none; border: none; font-size: 28px; cursor: pointer; color: var(--text-main); }
+
+.mt-mobile-grid-bubbles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 30px; }
+.mt-bubble-item {
+  background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 16px;
+  padding: 16px; text-align: center; font-size: 14px; font-weight: 600; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; transition: transform 0.1s;
+}
+.mt-bubble-item:active { transform: scale(0.96); background: #e5e5ea; }
+.mt-bubble-item.active { border-color: var(--accent-primary); background: rgba(0, 122, 255, 0.05); color: var(--accent-primary); }
+.mt-bubble-icon { font-size: 24px; }
+
+.mt-mobile-menu-bottom { background: var(--bg-app); border-radius: 16px; padding: 16px; margin-top: auto; border: 1px solid var(--border-color); }
+
+/* ---- iMessage Styled Apartment Card Updates ---- */
+.mt-apt-imessage-bubble {
+  background: #f1f1f4; border-radius: 18px; padding: 12px 16px; margin-top: 10px;
+  display: flex; align-items: center; gap: 12px; border: 1px solid #e5e5ea; max-width: 100%; box-sizing: border-box;
+}
+.mt-apt-favicon-frame {
+  width: 36px; height: 36px; background: white; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); flex-shrink: 0;
+}
+.mt-apt-favicon-frame img { width: 20px; height: 20px; object-fit: contain; }
+.mt-apt-preview-text { display: flex; flex-direction: column; min-width: 0; }
+.mt-apt-preview-headline { font-size: 13.5px; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mt-apt-preview-sub { font-size: 11px; color: var(--text-muted); transform: translateY(-1px); }
+
+/* Countdown & General UI Containers */
 
 .mt-countdown { font-family: 'JetBrains Mono', monospace; padding: 14px 22px; border-radius: 12px; color: #fff; text-align: center; font-weight: 600; min-width: 140px; }
 .mt-countdown .n { font-size: 28px; font-weight: 700; display: block; line-height: 1; }

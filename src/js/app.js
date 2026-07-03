@@ -1,6 +1,26 @@
 const AppEngine = window.MovingApp;
 let state = AppEngine.loadState();
 
+if (!state.activeTab) {
+  state.activeTab = 'dashboard';
+  AppEngine.saveState(state);
+}
+
+// Global Definitions for Mobile Grid Bubble Mapping Matrix
+const appSections = [
+  { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
+  { id: 'tasks', label: 'Milestone Timeline', icon: '📋' },
+  { id: 'aptsearch', label: 'Market Search', icon: '🔍' },
+  { id: 'apartments', label: 'Apartment Tracker', icon: '🏢' },
+  { id: 'supplies', label: 'Boxes & Supplies', icon: '📦' },
+  { id: 'donations', label: 'Donations Manager', icon: '🤝' },
+  { id: 'spend', label: 'Spending Ledger', icon: '💰' },
+  { id: 'movers', label: 'Moving Companies', icon: '🚛' },
+  { id: 'rooms', label: 'Room Packing Matrix', icon: '🏠' },
+  { id: 'addressutil', label: 'Address & Utilities', icon: '⚡' },
+  { id: 'dayof', label: 'Move Day Survival', icon: '🎯' }
+];
+
 // --- CORE ANIMATION ---
 function playWelcomeAnimation() {
   if (sessionStorage.getItem('hasAnimated')) return;
@@ -8,10 +28,9 @@ function playWelcomeAnimation() {
   const overlay = document.createElement('div');
   overlay.id = 'mt-welcome-overlay';
   
-  // Ensure image path matches your actual file structure
   overlay.innerHTML = `
     <div class="truck-wrapper">
-      <img src="src/assets/moving truck.webp" class="mt-truck-img" alt="Moving Truck" onerror="console.error('IMAGE FAILED TO LOAD: Check the path in app.js')" />
+      <img src="src/assets/moving truck.webp" class="mt-truck-img" alt="Moving Truck" onerror="console.error('IMAGE FAILED TO LOAD: Check your local folder directory structure')" />
       <div class="mt-box">📦</div>
     </div>
     <div class="mt-road"></div> 
@@ -30,8 +49,10 @@ function playWelcomeAnimation() {
   });
 
   overlay.querySelector('#mt-start-new').addEventListener('click', () => {
-    localStorage.clear();
-    location.reload();
+    if (confirm('Are you sure you want to completely clear your move data? This cannot be undone.')) {
+      localStorage.clear();
+      location.reload();
+    }
   });
 
   document.body.appendChild(overlay);
@@ -89,6 +110,77 @@ function getFunStat() {
     return `${days} day${days === 1 ? '' : 's'} to go. This is the home stretch.`;
   }
   return `Every box you pack now is one less thing to think about on move day.`;
+}
+
+// --- MOBILE INTERACTION WINDOW HOOKS ---
+window.openMobileMenu = function() {
+  const existing = document.getElementById('mt-mobile-nav-overlay');
+  if (existing) existing.remove();
+
+  const total = totalTaskCount();
+  const done = doneTaskCount();
+  const pct = total ? Math.round((done / total) * 100) : 0;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'mt-mobile-nav-overlay';
+  overlay.className = 'mt-mobile-menu-overlay';
+
+  overlay.innerHTML = `
+    <div class="mt-mobile-menu-header">
+      <h2>Navigate Move</h2>
+      <button class="mt-mobile-menu-close" onclick="document.getElementById('mt-mobile-nav-overlay').remove()">×</button>
+    </div>
+    <div class="mt-mobile-grid-bubbles">
+      ${appSections.map(sec => `
+        <div class="mt-bubble-item ${state.activeTab === sec.id ? 'active' : ''}" onclick="handleSectionTap('${sec.id}')">
+          <span class="mt-bubble-icon">${sec.icon}</span>
+          <span>${sec.label}</span>
+        </div>
+      `).join('')}
+    </div>
+    <div class="mt-mobile-menu-bottom">
+      <div class="mt-progress-meta"><span>COMPLETION METRIC</span><span>${pct}% Done</span></div>
+      <div class="mt-progress-track" style="margin-bottom:15px;"><div class="mt-progress-fill" style="width:${pct}%"></div></div>
+      <button class="mt-wizard-btn" id="mobile-gear-trigger" style="margin-bottom: 10px; width: 100%;">⚙️ Edit Move Details</button>
+      <div style="display:flex; gap:10px;">
+         <button class="mt-wizard-btn" id="mobile-export-trigger" style="flex:1; background:#8e8e93;">Export JSON</button>
+         <button class="mt-wizard-btn" id="mobile-import-trigger" style="flex:1; background:#8e8e93;">Import JSON</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // Wire up structural menu system hooks inside mobile overlay shell context
+  document.getElementById('mobile-gear-trigger').addEventListener('click', () => {
+    overlay.remove(); state.showWizardOverride = true; render();
+  });
+  document.getElementById('mobile-export-trigger').addEventListener('click', () => {
+    overlay.remove();
+    document.getElementById('mt-export-backup').click();
+  });
+  document.getElementById('mobile-import-trigger').addEventListener('click', () => {
+    overlay.remove();
+    document.getElementById('mt-import-backup').click();
+  });
+}
+
+window.handleSectionTap = function(tabId) {
+  state.activeTab = tabId;
+  AppEngine.saveState(state);
+  const menu = document.getElementById('mt-mobile-nav-overlay');
+  if (menu) menu.remove();
+  render();
+}
+
+// --- RENT BUDGET SELECT DROPDOWN REUSABLE HTML GENERATOR ---
+function renderRentDropdownHtml(elementId, placeholderText, activeValue) {
+  let html = `<select id="${elementId}" style="padding:10px; border:1px solid var(--border-color); border-radius:8px; font-size:13px; background:#fff; flex:1; min-width:120px;">`;
+  html += `<option value="">${placeholderText}</option>`;
+  for (let rent = 2500; rent <= 5000; rent += 250) {
+    html += `<option value="${rent}" ${activeValue == rent ? 'selected' : ''}>$${rent.toLocaleString()}</option>`;
+  }
+  html += `</select>`;
+  return html;
 }
 
 // --- HELPERS ---
@@ -156,16 +248,21 @@ function renderHeader() {
   if (days <= 14) urgencyClass = 'countdown-urgent';
   else if (days <= 45) urgencyClass = 'countdown-warning';
   const weekday = getMoveDayOfWeek(state.targetMoveDate);
-  const isWeekend = (weekday === 'Saturday' || weekday === 'Sunday');
   const parts = state.targetMoveDate.split('-');
   const moveDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
   const formattedMoveDate = moveDateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
+  const currentSec = appSections.find(s => s.id === state.activeTab);
+  const sectionTitle = currentSec ? currentSec.label : 'Moving Assistant';
+
   return `
     <div class="mt-header">
       <div class="mt-title-area">
-        <h1>The Big Move</h1>
-        <p>Target Date: <span style="font-size: 15px; color: var(--accent-primary); font-weight:700;">${formattedMoveDate} (${weekday})</span></p>
+        <button class="mt-hamburger-btn" onclick="window.openMobileMenu()">☰</button>
+        <div>
+          <h1>${sectionTitle}</h1>
+          <p>Target Date: <span style="font-size: 14px; color: var(--accent-primary); font-weight:700;">${formattedMoveDate} (${weekday})</span></p>
+        </div>
       </div>
       <div class="mt-countdown ${urgencyClass}">
         <span class="n">${days >= 0 ? days : 0}</span>
@@ -179,19 +276,6 @@ function renderSidebar() {
   const total = totalTaskCount();
   const done = doneTaskCount();
   const pct = total ? Math.round((done / total) * 100) : 0;
-  const tabs = [
-    ['dashboard', '🏠 Dashboard'],
-    ['tasks', '📋 Milestone Timeline'],
-    ['aptsearch', '🔍 Market Search Timeline'],
-    ['apartments', '🏢 Apartment Tracker'],
-    ['supplies', '📦 Boxes & Supplies'],
-    ['donations', '🤝 Donations Manager'],
-    ['spend', '💰 Spending Ledger'],
-    ['movers', '🚛 Moving Companies'],
-    ['rooms', '🏠 Room Packing Matrix'],
-    ['addressutil', '⚡ Address & Utilities'],
-    ['dayof', '🎯 Move Day Survival']
-  ];
 
   return `
     <div class="mt-sidebar">
@@ -201,7 +285,7 @@ function renderSidebar() {
           <div class="username">${esc(state.userName || 'Friend')}</div>
         </div>
         <div class="mt-nav">
-          ${tabs.map(([id, label]) => `<button data-tab="${id}" class="${state.activeTab === id ? 'active' : ''}">${label}</button>`).join('')}
+          ${appSections.map(sec => `<button data-tab="${sec.id}" class="${state.activeTab === sec.id ? 'active' : ''}">${sec.icon} ${sec.label}</button>`).join('')}
         </div>
       </div>
       <div>
@@ -226,28 +310,45 @@ function renderDashboard() {
   const focus = getTodaysFocus();
 
   return `
-    <div style="padding: 40px;">
-      <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 30px;">Dashboard</h1>
-      
-      <div style="display: flex; gap: 20px; margin-bottom: 30px;">
-        <div class="mt-card" style="padding: 20px; flex: 1;">
-          <div style="font-size: 32px; font-weight: 800;">${days} Days</div>
-          <div style="color: var(--text-muted); font-size: 12px; font-weight: 600; text-transform: uppercase;">Remaining</div>
+    <div style="padding: 10px 0;">
+      <div class="mt-hero-card">
+        <svg class="truck-icon" viewBox="0 0 100 60" style="margin-bottom: 15px;">
+          <path d="M10 40 h60 v-20 h-50 l-10 10 z" fill="#FFD700" />
+          <rect x="70" y="20" width="20" height="20" fill="#FFD700" />
+          <circle cx="25" cy="50" r="8" fill="#333" />
+          <circle cx="75" cy="50" r="8" fill="#333" />
+        </svg>
+        
+        <h1>Good Evening, ${esc(state.userName || 'Andy')} 👋</h1>
+        <p>You're in great shape.</p>
+
+        <div class="mt-recommendation">
+          <h3>Today's recommendation</h3>
+          <p style="font-weight: 600; margin: 0; font-size:16px; color: var(--text-main);">${esc(focus.text)}</p>
+          <small style="color: var(--accent-primary); font-weight:500; display:block; margin-top:4px;">${esc(focus.phase)}</small>
         </div>
-        <div class="mt-card" style="padding: 20px; flex: 1;">
-          <div style="font-size: 32px; font-weight: 800;">${pct}%</div>
-          <div style="color: var(--text-muted); font-size: 12px; font-weight: 600; text-transform: uppercase;">Progress</div>
+
+        <div class="mt-progress-container" style="max-width: 400px; margin: 30px auto 0 auto;">
+          <div class="mt-progress-track">
+            <div class="mt-progress-fill" style="width:${pct}%"></div>
+          </div>
+          <p style="margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--text-muted);">${pct}% Complete</p>
         </div>
       </div>
 
-      <div class="mt-card" style="padding: 20px; border-left: 5px solid var(--accent-primary);">
-        <h3 style="margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; color: var(--text-muted);">Today's Focus</h3>
-        <p style="font-size: 18px; font-weight: 600; margin-bottom: 5px;">${esc(focus.text)}</p>
-        <p style="font-size: 12px; color: var(--accent-primary);">${esc(focus.phase)}</p>
+      <div style="display: flex; gap: 16px; margin-bottom: 20px;">
+        <div class="mt-card" style="padding: 20px; flex: 1; margin:0; text-align:center;">
+          <div style="font-size: 28px; font-weight: 800; color:var(--text-main);">${days} Days</div>
+          <div style="color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing:0.02em; margin-top:4px;">Remaining</div>
+        </div>
+        <div class="mt-card" style="padding: 20px; flex: 1; margin:0; text-align:center;">
+          <div style="font-size: 28px; font-weight: 800; color:var(--text-main);">${pct}%</div>
+          <div style="color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing:0.02em; margin-top:4px;">Progress</div>
+        </div>
       </div>
 
-      <div class="mt-card" style="padding: 16px 20px; margin-top: 16px; background: rgba(0,122,255,0.05); border-color: rgba(0,122,255,0.15);">
-        <p style="margin: 0; font-size: 13.5px; font-weight: 600;">${esc(getFunStat())}</p>
+      <div class="mt-card" style="padding: 16px 20px; background: rgba(0,122,255,0.04); border-color: rgba(0,122,255,0.12); margin:0;">
+        <p style="margin: 0; font-size: 13.5px; font-weight: 600; text-align:center; color: var(--text-main);">${esc(getFunStat())}</p>
       </div>
     </div>
   `;
@@ -288,9 +389,8 @@ function renderAptSearch() {
 
 function renderApartments() {
   const list = state.apartments || [];
-  const { max40xRent, comfortCeiling } = AppEngine.getBudgetLimits(state.annualIncome);
-  const min = parseFloat(state.targetBudgetMin) || 0;
   const max = parseFloat(state.targetBudgetMax) || 0;
+  
   const cards = list.length ? list.slice().reverse().map((a, ri) => {
     const i = list.length - 1 - ri;
     const status = a.status || 'Visited'; 
@@ -298,18 +398,33 @@ function renderApartments() {
     if (status === 'Applied') statusClass = 'mt-badge-stretching';
     else if (status === 'Rejected') statusClass = 'mt-badge-fail';
     else if (status === 'Lease Signed') statusClass = 'mt-badge-success';
-    const safeUrl = a.url && /^https?:\/\//i.test(a.url) ? a.url : null;
+
+    let hostname = "Listing URL";
+    let faviconUrl = "🏢";
+    if (a.url) {
+      try {
+        const parsedUrl = new URL(a.url);
+        hostname = parsedUrl.hostname.replace('www.', '');
+        faviconUrl = `<img src="https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32" alt="favicon" />`;
+      } catch(e) {
+        hostname = "External Reference Link";
+        faviconUrl = "🔗";
+      }
+    }
+
+    const minRentText = a.minRent ? `$${parseFloat(a.minRent).toLocaleString()}` : "Any";
+    const maxRentText = a.maxRent ? `$${parseFloat(a.maxRent).toLocaleString()}` : "Any";
 
     return `
       <div class="mt-apt-card">
         <div class="mt-apt-card-top">
           <div>
-            <h4>${esc(a.name)}</h4>
-            ${safeUrl ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer" class="mt-apt-link-chip">🔗 View Listing</a>` : ''}
-            <div style="margin-top: 6px;">
+            <h4 style="margin:0 0 4px 0; font-size:16px;">${esc(a.name)}</h4>
+            <span style="font-size:12px; color:var(--text-muted); font-weight:500;">Bracket Matrix: ${minRentText} – ${maxRentText}</span>
+            <div style="margin-top: 10px;">
               ${AppEngine.APT_STATUSES.map(s => `
                 <button data-apt-status="${i}" data-status-val="${s}" 
-                  style="font-size: 10px; padding: 2px 6px; margin-right: 4px; margin-top: 4px; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; ${status === s ? 'background: var(--accent-primary); color: white;' : 'background: white;'}"
+                  style="font-size: 10px; padding: 3px 8px; margin-right: 4px; margin-top: 4px; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; ${status === s ? 'background: var(--accent-primary); color: white;' : 'background: white;'}"
                 >${s}</button>
               `).join('')}
             </div>
@@ -319,7 +434,20 @@ function renderApartments() {
             <span class="mt-apt-status ${statusClass}">${status}</span>
           </div>
         </div>
-        <button class="mt-apt-card-remove" data-apt-remove="${i}" style="margin-top: 10px; font-size: 11px; background: none; border: none; color: var(--accent-danger); cursor: pointer;">Delete Listing</button>
+
+        ${a.url ? `
+          <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; display:block;">
+            <div class="mt-apt-imessage-bubble">
+              <div class="mt-apt-favicon-frame">${faviconUrl}</div>
+              <div class="mt-apt-preview-text">
+                <span class="mt-apt-preview-headline">${esc(a.name || 'View Apartment Listing')}</span>
+                <span class="mt-apt-preview-sub">${esc(hostname)}</span>
+              </div>
+            </div>
+          </a>
+        ` : ''}
+
+        <button class="mt-apt-card-remove" data-apt-remove="${i}" style="margin-top: 14px; font-size: 11px; background: none; border: none; color: var(--accent-danger); cursor: pointer;">Delete Listing</button>
       </div>
     `;
   }).join('') : '<div class="mt-empty">No apartments logged yet.</div>';
@@ -331,10 +459,10 @@ function renderApartments() {
     </div>
     <div class="mt-income-wrapper">
       <label>Target Budget Range ($/mo):</label>
-      <div style="display:flex; gap:10px; align-items:center;">
-        <input type="number" id="mt-budget-min" placeholder="Min (e.g. 3500)" value="${state.targetBudgetMin || ''}" style="flex:1;" />
-        <span style="color: var(--text-muted);">–</span>
-        <input type="number" id="mt-budget-max" placeholder="Max (e.g. 4000)" value="${state.targetBudgetMax || ''}" style="flex:1;" />
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom: 12px;">
+        ${renderRentDropdownHtml('mt-apt-min-rent', 'Min Target Rent', state.targetBudgetMin || '')}
+        <span style="color: var(--text-muted); font-weight:600;">–</span>
+        ${renderRentDropdownHtml('mt-apt-max-rent', 'Max Target Rent', state.targetBudgetMax || '')}
       </div>
       ${max > 0 ? `
         <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 8px;">
@@ -347,20 +475,22 @@ function renderApartments() {
         </p>
       ` : ''}
     </div>
-    <div class="mt-apt-form">
-      <input type="text" id="mt-apt-name" placeholder="Address / Building Name" />
-      <input type="number" id="mt-apt-price" placeholder="Rent/mo" />
-      <input type="url" id="mt-apt-url" placeholder="Listing URL (optional)" style="flex: 2; min-width: 160px;" />
-      <button class="mt-wizard-btn" id="mt-apt-submit" style="width: auto;">Add Apartment</button>
+    <div class="mt-apt-form" style="display:flex; flex-direction:column; gap:10px; margin-top: 20px;">
+      <input type="text" id="mt-apt-name" placeholder="Address / Building Name" style="width:100%; box-sizing:border-box;" />
+      <input type="url" id="mt-apt-url" placeholder="Paste Listing URL Link (StreetEasy, Zillow, etc.)" style="width:100%; box-sizing:border-box;" />
+      <input type="number" id="mt-apt-price" placeholder="Rent Amount/mo" style="width:100%; box-sizing:border-box;" />
+      <button class="mt-wizard-btn" id="mt-apt-submit" style="width: 100%;">Add Apartment</button>
     </div>
-    ${cards}
+    <div style="margin-top: 20px;">
+      ${cards}
+    </div>
   `;
 }
 
 function renderSupplies() {
   const boxCalculations = AppEngine.calculateSuppliesConfig(state.aptSize);
   return `
-    <div style="font-family:'Oswald'; font-size:14px; text-transform:uppercase; margin-bottom:10px; color:var(--text-muted);">Calculated Volume Inventory Metrics:</div>
+    <div style="font-family:'Oswald', sans-serif; font-size:14px; text-transform:uppercase; margin-bottom:10px; color:var(--text-muted); font-weight:700; letter-spacing:0.02em;">Calculated Volume Inventory Metrics:</div>
     <div class="mt-supply-metrics">
       <div class="mt-supply-badge"><span class="count">${boxCalculations.small}</span><span class="label">Small Boxes</span></div>
       <div class="mt-supply-badge"><span class="count">${boxCalculations.medium}</span><span class="label">Medium Boxes</span></div>
@@ -391,14 +521,14 @@ function renderDonations() {
     const items = state.donations[cat] || [];
     return `
       <div class="mt-cat">
-        <h4><span>${esc(cat)}</span><span style="color:var(--accent-primary); font-family:monospace;">${items.length}</span></h4>
+        <h4><span>${esc(cat)}</span><span style="color:var(--accent-primary); font-family:monospace; font-weight:700; margin-left:8px;">${items.length}</span></h4>
         <ul>
           ${items.length ? items.map((item, i) => `
             <li><span>${esc(item)}</span><button data-don-remove="${esc(cat)}|${i}">×</button></li>
           `).join('') : '<li class="mt-empty">Empty</li>'}
         </ul>
         <div class="mt-cat-add">
-          <input type="text" placeholder="Add..." data-don-input="${esc(cat)}" />
+          <input type="text" placeholder="Add item..." data-don-input="${esc(cat)}" />
           <button data-don-add="${esc(cat)}">+</button>
         </div>
       </div>
@@ -421,17 +551,17 @@ function renderSpend() {
 
   return `
     <div class="mt-apt-summary">
-      <div class="mt-apt-stat"><span class="n">$${total.toFixed(2)}</span><span class="l">Total Outflow</span></div>
+      <div class="mt-apt-stat" style="text-align:center; width:100%;"><span class="n">$${total.toFixed(2)}</span><span class="l">Total Outflow</span></div>
     </div>
-    <div class="mt-spend-form">
+    <div class="mt-spend-form" style="margin-top: 15px;">
       <select id="mt-spend-cat">
         ${AppEngine.SPEND_CATEGORIES.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}
       </select>
       <input type="text" id="mt-spend-note" placeholder="Item notation description" />
       <input type="number" id="mt-spend-amt" placeholder="$0.00" />
-      <button id="mt-spend-submit">Log Transaction</button>
+      <button id="mt-spend-submit" class="mt-wizard-btn" style="width:100%; margin-top:5px;">Log Transaction</button>
     </div>
-    <div class="mt-card"><div class="mt-card-body">${rows}</div></div>
+    <div class="mt-card" style="margin-top:20px;"><div class="mt-card-body">${rows}</div></div>
   `;
 }
 
@@ -455,20 +585,20 @@ function renderMovers() {
     <div class="mt-card">
       <div class="mt-card-header"><h3>Other Movers You're Considering</h3></div>
       <div class="mt-card-body">
-        <div class="mt-apt-form" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
-          <input type="text" id="mover-name" placeholder="Company name" style="flex:1; min-width:140px;" />
-          <input type="text" id="mover-phone" placeholder="Phone" style="flex:1; min-width:120px;" />
-          <input type="text" id="mover-notes" placeholder="Notes (quote, reviews, etc.)" style="flex:2; min-width:160px;" />
-          <button class="mt-wizard-btn" id="mover-add-btn" style="width:auto;">Add Mover</button>
+        <div class="mt-apt-form" style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px; padding: 10px 0;">
+          <input type="text" id="mover-name" placeholder="Company name" style="width:100%; box-sizing:border-box;" />
+          <input type="text" id="mover-phone" placeholder="Phone" style="width:100%; box-sizing:border-box;" />
+          <input type="text" id="mover-notes" placeholder="Notes (quote, reviews, etc.)" style="width:100%; box-sizing:border-box;" />
+          <button class="mt-wizard-btn" id="mover-add-btn" style="width:100%;">Add Mover</button>
         </div>
         ${state.customMovers.length === 0
-          ? '<p style="color:var(--text-muted); font-size:13px;">Add any other movers you\'re getting quotes from.</p>'
+          ? '<p style="color:var(--text-muted); font-size:13px; text-align:center; padding:10px 0;">Add any other movers you\'re getting quotes from.</p>'
           : `<div class="mt-mover-grid">
               ${state.customMovers.map((m, i) => `
                 <div class="mt-mover">
                   <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <h4>${esc(m.name)}</h4>
-                    <span data-remove-mover="${i}" style="cursor:pointer; color:var(--text-muted); font-size:13px;">✕</span>
+                    <span data-remove-mover="${i}" style="cursor:pointer; color:var(--text-muted); font-size:16px; padding:0 4px;">✕</span>
                   </div>
                   ${m.phone ? `<p style="color:var(--accent-primary); font-weight:600; font-family:monospace; margin:4px 0;">${esc(m.phone)}</p>` : ''}
                   ${m.notes ? `<p>${esc(m.notes)}</p>` : ''}
@@ -488,11 +618,11 @@ function renderRooms() {
         const currentStatus = state.rooms[room] || 'Not started';
         return `
           <div class="mt-cat">
-            <h4>${esc(room)}</h4>
-            <div style="display:flex; gap:6px; margin-top:10px;">
-              <button data-room="${esc(room)}" data-room-status="Not started" class="btn-status-red ${currentStatus === 'Not started' ? 'active' : ''}" style="flex:1; padding:6px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); cursor:pointer;">Not Started</button>
-              <button data-room="${esc(room)}" data-room-status="In progress" class="btn-status-yellow ${currentStatus === 'In progress' ? 'active' : ''}" style="flex:1; padding:6px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); cursor:pointer;">In Progress</button>
-              <button data-room="${esc(room)}" data-room-status="Packed" class="btn-status-green ${currentStatus === 'Packed' ? 'active' : ''}" style="flex:1; padding:6px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); cursor:pointer;">Packed</button>
+            <h4 style="margin:0 0 10px 0;">${esc(room)}</h4>
+            <div style="display:flex; gap:6px;">
+              <button data-room="${esc(room)}" data-room-status="Not started" class="btn-status-red ${currentStatus === 'Not started' ? 'active' : ''}" style="flex:1; padding:8px 4px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); cursor:pointer;">Not Started</button>
+              <button data-room="${esc(room)}" data-room-status="In progress" class="btn-status-yellow ${currentStatus === 'In progress' ? 'active' : ''}" style="flex:1; padding:8px 4px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); cursor:pointer;">In Progress</button>
+              <button data-room="${esc(room)}" data-room-status="Packed" class="btn-status-green ${currentStatus === 'Packed' ? 'active' : ''}" style="flex:1; padding:8px 4px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); cursor:pointer;">Packed</button>
             </div>
           </div>
         `;
@@ -507,8 +637,8 @@ function renderAddressUtil() {
     return `
       <tr>
         <td><b>${esc(u)}</b></td>
-        <td><input type="date" data-util="${esc(u)}" data-util-field="oldCancelDate" value="${esc(rec.oldCancelDate || '')}" /></td>
-        <td><input type="date" data-util="${esc(u)}" data-util-field="newStartDate" value="${rec.newStartDate || ''}" /></td>
+        <td><input type="date" data-util="${esc(u)}" data-util-field="oldCancelDate" value="${esc(rec.oldCancelDate || '')}" style="width:100%; box-sizing:border-box; font-size:12px; padding:4px;" /></td>
+        <td><input type="date" data-util="${esc(u)}" data-util-field="newStartDate" value="${esc(rec.newStartDate || '')}" style="width:100%; box-sizing:border-box; font-size:12px; padding:4px;" /></td>
       </tr>
     `;
   }).join('');
@@ -529,11 +659,11 @@ function renderAddressUtil() {
         }).join('')}
       </div>
     </div>
-    <div class="mt-card" style="margin-top:20px;">
+    <div class="mt-card" style="margin-top:20px; overflow-x: auto;">
       <div class="mt-card-header"><h3>Utility Connections</h3></div>
-      <div class="mt-card-body">
-        <table class="mt-util-table">
-          <thead><tr><th>Utility Line</th><th>Disconnect Date</th><th>Activation Date</th></tr></thead>
+      <div class="mt-card-body" style="padding: 10px 20px;">
+        <table class="mt-util-table" style="width:100%; border-collapse: collapse;">
+          <thead><tr><th style="text-align:left; padding:8px 0;">Utility</th><th style="text-align:left;">Disconnect</th><th style="text-align:left;">Activation</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -546,12 +676,12 @@ function renderDayOf() {
     <div class="mt-card">
       <div class="mt-card-header"><h3>Move Day Strategy Reminders</h3></div>
       <div class="mt-card-body">
-        <ul style="padding-left:20px; line-height:1.8; font-size:13.5px;">
+        <ul style="padding-left:20px; line-height:1.8; font-size:13.5px; margin: 12px 0;">
           ${AppEngine.MOVE_TIPS.map(t => `<li>${esc(t)}</li>`).join('')}
         </ul>
       </div>
     </div>
-    <textarea class="mt-notes-area" id="mt-notes" placeholder="Drop logistical run-sheets or notes here...">${esc(state.notes || '')}</textarea>
+    <textarea class="mt-notes-area" id="mt-notes" placeholder="Drop logistical run-sheets or notes here..." style="width:100%; min-height:180px; box-sizing:border-box; padding:12px; border-radius:8px; border:1px solid var(--border-color); font-family:inherit; font-size:13px; line-height:1.5; margin-top:15px;">${esc(state.notes || '')}</textarea>
   `;
 }
 
@@ -666,19 +796,18 @@ function attachHandlers() {
     incomeInput.addEventListener('blur', () => render());
   }
 
-  const budgetMinInput = root.querySelector('#mt-budget-min');
+  // Apartment Tracker budget listeners connected to the drop option selectors
+  const budgetMinInput = root.querySelector('#mt-apt-min-rent');
   if (budgetMinInput) {
-    budgetMinInput.addEventListener('input', () => { state.targetBudgetMin = budgetMinInput.value; AppEngine.saveState(state); });
-    budgetMinInput.addEventListener('blur', () => render());
+    budgetMinInput.addEventListener('change', () => { state.targetBudgetMin = budgetMinInput.value; AppEngine.saveState(state); render(); });
   }
 
-  const budgetMaxInput = root.querySelector('#mt-budget-max');
+  const budgetMaxInput = root.querySelector('#mt-apt-max-rent');
   if (budgetMaxInput) {
-    budgetMaxInput.addEventListener('input', () => { state.targetBudgetMax = budgetMaxInput.value; AppEngine.saveState(state); });
-    budgetMaxInput.addEventListener('blur', () => render());
+    budgetMaxInput.addEventListener('change', () => { state.targetBudgetMax = budgetMaxInput.value; AppEngine.saveState(state); render(); });
   }
 
-  root.querySelectorAll('[data-tab]').forEach(btn => {
+  root.querySelectorAll('.mt-nav [data-tab]').forEach(btn => {
     btn.addEventListener('click', () => { state.activeTab = btn.getAttribute('data-tab'); AppEngine.saveState(state); render(); });
   });
 
@@ -700,8 +829,10 @@ function attachHandlers() {
   root.querySelectorAll('[data-don-add]').forEach(btn => {
     btn.addEventListener('click', () => {
       const cat = btn.getAttribute('data-don-add');
-      const val = root.querySelector(`[data-don-input="${CSS.escape(cat)}"]`).value.trim();
+      const inputEl = root.querySelector(`[data-don-input="${CSS.escape(cat)}"]`);
+      const val = inputEl ? inputEl.value.trim() : '';
       if (!val) return;
+      if (!state.donations[cat]) state.donations[cat] = [];
       state.donations[cat].push(val);
       AppEngine.saveState(state);
       render();
@@ -735,7 +866,10 @@ function attachHandlers() {
 
   root.querySelectorAll('[data-util]').forEach(input => {
     input.addEventListener('change', () => {
-      state.utilities[input.getAttribute('data-util')][input.getAttribute('data-util-field')] = input.value;
+      const util = input.getAttribute('data-util');
+      const field = input.getAttribute('data-util-field');
+      if (!state.utilities[util]) state.utilities[util] = { oldCancelDate: '', newStartDate: '' };
+      state.utilities[util][field] = input.value;
       AppEngine.saveState(state);
     });
   });
@@ -751,35 +885,16 @@ function attachHandlers() {
       const name = root.querySelector('#mt-apt-name').value.trim();
       const price = root.querySelector('#mt-apt-price').value;
       const url = root.querySelector('#mt-apt-url').value.trim();
-      if (!name || !price) return;
-      state.apartments.push({ name, price, url });
+      const minRent = root.querySelector('#mt-apt-min-rent').value;
+      const maxRent = root.querySelector('#mt-apt-max-rent').value;
+
+      if (!name || !price) return alert('Building Address and Monthly Rent are required.');
+      
+      state.apartments.push({ name, price, url, minRent, maxRent, status: 'Visited' });
       AppEngine.saveState(state);
       render();
     });
   }
-
-  const moverAddBtn = root.querySelector('#mover-add-btn');
-  if (moverAddBtn) {
-    moverAddBtn.addEventListener('click', () => {
-      const name = root.querySelector('#mover-name').value.trim();
-      const phone = root.querySelector('#mover-phone').value.trim();
-      const notes = root.querySelector('#mover-notes').value.trim();
-      if (!name) return;
-      state.customMovers.push({ name, phone, notes });
-      AppEngine.saveState(state);
-      render();
-    });
-  }
-
-  root.querySelectorAll('[data-remove-mover]').forEach(el => {
-    el.addEventListener('click', () => {
-      const idx = parseInt(el.getAttribute('data-remove-mover'), 10);
-      if (!confirm('Remove this mover?')) return;
-      state.customMovers.splice(idx, 1);
-      AppEngine.saveState(state);
-      render();
-    });
-  });
 
   root.querySelectorAll('[data-apt-status]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -791,7 +906,35 @@ function attachHandlers() {
   });
 
   root.querySelectorAll('[data-apt-remove]').forEach(btn => {
-    btn.addEventListener('click', () => { state.apartments.splice(parseInt(btn.getAttribute('data-apt-remove'), 10), 1); AppEngine.saveState(state); render(); });
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.getAttribute('data-apt-remove'), 10);
+      state.apartments.splice(idx, 1);
+      AppEngine.saveState(state);
+      render();
+    });
+  });
+
+  const moverAddBtn = root.querySelector('#mover-add-btn');
+  if (moverAddBtn) {
+    moverAddBtn.addEventListener('click', () => {
+      const name = root.querySelector('#mover-name').value.trim();
+      const phone = root.querySelector('#mover-phone').value.trim();
+      const notes = root.querySelector('#mover-notes').value.trim();
+      if (!name) return alert('Company name is required.');
+      state.customMovers.push({ name, phone, notes });
+      AppEngine.saveState(state);
+      render();
+    });
+  }
+
+  root.querySelectorAll('[data-remove-mover]').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.getAttribute('data-remove-mover'), 10);
+      if (!confirm('Remove this custom mover from your comparison grid?')) return;
+      state.customMovers.splice(idx, 1);
+      AppEngine.saveState(state);
+      render();
+    });
   });
 
   const spendSubmit = root.querySelector('#mt-spend-submit');
@@ -800,7 +943,7 @@ function attachHandlers() {
       const cat = root.querySelector('#mt-spend-cat').value;
       const note = root.querySelector('#mt-spend-note').value.trim();
       const amt = root.querySelector('#mt-spend-amt').value;
-      if (!amt) return;
+      if (!amt) return alert('Please enter an amount.');
       state.spend.push({ category: cat, note, amount: amt });
       AppEngine.saveState(state);
       render();
@@ -808,11 +951,18 @@ function attachHandlers() {
   }
 
   root.querySelectorAll('[data-spend-remove]').forEach(btn => {
-    btn.addEventListener('click', () => { state.spend.splice(parseInt(btn.getAttribute('data-spend-remove'), 10), 1); AppEngine.saveState(state); render(); });
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.getAttribute('data-spend-remove'), 10);
+      state.spend.splice(idx, 1);
+      AppEngine.saveState(state);
+      render();
+    });
   });
 }
 
 // --- STARTUP ---
-document.getElementById('mt-loading').style.display = 'none';
+const loadingIndicator = document.getElementById('mt-loading');
+if (loadingIndicator) loadingIndicator.style.display = 'none';
+
 playWelcomeAnimation();
 render();
