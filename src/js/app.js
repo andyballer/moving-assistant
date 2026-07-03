@@ -312,12 +312,6 @@ function renderDashboard() {
   return `
     <div style="padding: 10px 0;">
       <div class="mt-hero-card">
-        <svg class="truck-icon" viewBox="0 0 100 60" style="margin-bottom: 15px;">
-          <path d="M10 40 h60 v-20 h-50 l-10 10 z" fill="#FFD700" />
-          <rect x="70" y="20" width="20" height="20" fill="#FFD700" />
-          <circle cx="25" cy="50" r="8" fill="#333" />
-          <circle cx="75" cy="50" r="8" fill="#333" />
-        </svg>
         
         <h1>Good Evening, ${esc(state.userName || 'Andy')} 👋</h1>
         <p>You're in great shape.</p>
