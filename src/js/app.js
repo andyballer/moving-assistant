@@ -17,7 +17,7 @@ function playWelcomeAnimation() {
     <div class="mt-road"></div> 
     <div class="welcome-content">
       <h1 style="font-size: 48px; font-weight: 800; margin-bottom: 10px;">Moving Assistant</h1>
-      <p style="color: var(--text-muted); font-size: 20px;">Welcome back, ${esc(state.userName || 'Andy')}.</p>
+      <p style="color: var(--text-muted); font-size: 20px;">Welcome back, ${esc(state.userName || 'friend')}.</p>
       <button id="mt-enter-app" class="mt-wizard-btn" style="margin-top: 20px; width: auto; padding: 15px 40px; font-size: 18px;">Resume Move</button>
       <button id="mt-start-new" style="display:block; margin: 15px auto; background:none; border:none; color:var(--text-muted); cursor:pointer;">Start New Move</button>
     </div>
@@ -198,7 +198,7 @@ function renderSidebar() {
       <div class="mt-sidebar-top">
         <div class="mt-user-badge">
           <div class="welcome">Packing for a ${state.aptSize.toUpperCase()}</div>
-          <div class="username">${esc(state.userName || 'Andy')}</div>
+          <div class="username">${esc(state.userName || 'Friend')}</div>
         </div>
         <div class="mt-nav">
           ${tabs.map(([id, label]) => `<button data-tab="${id}" class="${state.activeTab === id ? 'active' : ''}">${label}</button>`).join('')}
@@ -289,6 +289,8 @@ function renderAptSearch() {
 function renderApartments() {
   const list = state.apartments || [];
   const { max40xRent, comfortCeiling } = AppEngine.getBudgetLimits(state.annualIncome);
+  const min = parseFloat(state.targetBudgetMin) || 0;
+  const max = parseFloat(state.targetBudgetMax) || 0;
   const cards = list.length ? list.slice().reverse().map((a, ri) => {
     const i = list.length - 1 - ri;
     const status = a.status || 'Visited'; 
@@ -296,16 +298,18 @@ function renderApartments() {
     if (status === 'Applied') statusClass = 'mt-badge-stretching';
     else if (status === 'Rejected') statusClass = 'mt-badge-fail';
     else if (status === 'Lease Signed') statusClass = 'mt-badge-success';
+    const safeUrl = a.url && /^https?:\/\//i.test(a.url) ? a.url : null;
 
     return `
       <div class="mt-apt-card">
         <div class="mt-apt-card-top">
           <div>
             <h4>${esc(a.name)}</h4>
+            ${safeUrl ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer" class="mt-apt-link-chip">🔗 View Listing</a>` : ''}
             <div style="margin-top: 6px;">
               ${AppEngine.APT_STATUSES.map(s => `
                 <button data-apt-status="${i}" data-status-val="${s}" 
-                  style="font-size: 10px; padding: 2px 6px; margin-right: 4px; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; ${status === s ? 'background: var(--accent-primary); color: white;' : 'background: white;'}"
+                  style="font-size: 10px; padding: 2px 6px; margin-right: 4px; margin-top: 4px; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; ${status === s ? 'background: var(--accent-primary); color: white;' : 'background: white;'}"
                 >${s}</button>
               `).join('')}
             </div>
@@ -325,9 +329,28 @@ function renderApartments() {
       <label>Annual Income (for a rough budget check):</label>
       <input type="number" id="mt-income-input" value="${state.annualIncome || ''}" />
     </div>
+    <div class="mt-income-wrapper">
+      <label>Target Budget Range ($/mo):</label>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <input type="number" id="mt-budget-min" placeholder="Min (e.g. 3500)" value="${state.targetBudgetMin || ''}" style="flex:1;" />
+        <span style="color: var(--text-muted);">–</span>
+        <input type="number" id="mt-budget-max" placeholder="Max (e.g. 4000)" value="${state.targetBudgetMax || ''}" style="flex:1;" />
+      </div>
+      ${max > 0 ? `
+        <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 8px;">
+          For a $${max.toLocaleString()}/mo max, most landlords want to see an annual income of at least
+          <strong>$${(max * 40).toLocaleString()}</strong> (the standard 40x rent rule).
+          ${state.annualIncome ? (state.annualIncome >= max * 40
+            ? ' Your current income clears that.'
+            : ` That's about $${((max * 40) - state.annualIncome).toLocaleString()} above your current income — a guarantor may be worth looking into.`)
+            : ''}
+        </p>
+      ` : ''}
+    </div>
     <div class="mt-apt-form">
       <input type="text" id="mt-apt-name" placeholder="Address / Building Name" />
       <input type="number" id="mt-apt-price" placeholder="Rent/mo" />
+      <input type="url" id="mt-apt-url" placeholder="Listing URL (optional)" style="flex: 2; min-width: 160px;" />
       <button class="mt-wizard-btn" id="mt-apt-submit" style="width: auto;">Add Apartment</button>
     </div>
     ${cards}
@@ -414,14 +437,46 @@ function renderSpend() {
 
 function renderMovers() {
   return `
-    <div class="mt-mover-grid">
-      ${AppEngine.MOVERS.map(m => `
-        <div class="mt-mover">
-          <h4>${esc(m.name)}</h4>
-          <p style="color:var(--accent-primary); font-weight:600; font-family:monospace; margin:4px 0;">${esc(m.phone)}</p>
-          <p>${esc(m.desc)}</p>
+    <div class="mt-card" style="margin-bottom: 20px;">
+      <div class="mt-card-header"><h3>NYC Movers</h3></div>
+      <div class="mt-card-body">
+        <div class="mt-mover-grid">
+          ${AppEngine.MOVERS.map(m => `
+            <div class="mt-mover">
+              <h4>${esc(m.name)}</h4>
+              <p style="color:var(--accent-primary); font-weight:600; font-family:monospace; margin:4px 0;">${esc(m.phone)}</p>
+              <p>${esc(m.desc)}</p>
+            </div>
+          `).join('')}
         </div>
-      `).join('')}
+      </div>
+    </div>
+
+    <div class="mt-card">
+      <div class="mt-card-header"><h3>Other Movers You're Considering</h3></div>
+      <div class="mt-card-body">
+        <div class="mt-apt-form" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+          <input type="text" id="mover-name" placeholder="Company name" style="flex:1; min-width:140px;" />
+          <input type="text" id="mover-phone" placeholder="Phone" style="flex:1; min-width:120px;" />
+          <input type="text" id="mover-notes" placeholder="Notes (quote, reviews, etc.)" style="flex:2; min-width:160px;" />
+          <button class="mt-wizard-btn" id="mover-add-btn" style="width:auto;">Add Mover</button>
+        </div>
+        ${state.customMovers.length === 0
+          ? '<p style="color:var(--text-muted); font-size:13px;">Add any other movers you\'re getting quotes from.</p>'
+          : `<div class="mt-mover-grid">
+              ${state.customMovers.map((m, i) => `
+                <div class="mt-mover">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <h4>${esc(m.name)}</h4>
+                    <span data-remove-mover="${i}" style="cursor:pointer; color:var(--text-muted); font-size:13px;">✕</span>
+                  </div>
+                  ${m.phone ? `<p style="color:var(--accent-primary); font-weight:600; font-family:monospace; margin:4px 0;">${esc(m.phone)}</p>` : ''}
+                  ${m.notes ? `<p>${esc(m.notes)}</p>` : ''}
+                </div>
+              `).join('')}
+            </div>`
+        }
+      </div>
     </div>
   `;
 }
@@ -508,8 +563,8 @@ function render() {
         <div class="mt-wizard-card">
           <h2>📦 Welcome! Let's Get Your Move On</h2>
           <p>Just the basics — we'll handle the rest.</p>
-          <div class="mt-wizard-field"><label>What should we call you?</label><input type="text" id="wiz-name" value="${state.userName || 'Andy'}" /></div>
-          <div class="mt-wizard-field"><label>When's moving day?</label><input type="date" id="wiz-date" value="${state.targetMoveDate || '2026-09-01'}" /></div>
+          <div class="mt-wizard-field"><label>What should we call you?</label><input type="text" id="wiz-name" placeholder="e.g. Andy" value="${esc(state.userName || '')}" /></div>
+          <div class="mt-wizard-field"><label>When's moving day?</label><input type="date" id="wiz-date" value="${state.targetMoveDate || ''}" /></div>
           <div class="mt-wizard-field">
             <label>How big's the place?</label>
             <select id="wiz-size">
@@ -611,6 +666,18 @@ function attachHandlers() {
     incomeInput.addEventListener('blur', () => render());
   }
 
+  const budgetMinInput = root.querySelector('#mt-budget-min');
+  if (budgetMinInput) {
+    budgetMinInput.addEventListener('input', () => { state.targetBudgetMin = budgetMinInput.value; AppEngine.saveState(state); });
+    budgetMinInput.addEventListener('blur', () => render());
+  }
+
+  const budgetMaxInput = root.querySelector('#mt-budget-max');
+  if (budgetMaxInput) {
+    budgetMaxInput.addEventListener('input', () => { state.targetBudgetMax = budgetMaxInput.value; AppEngine.saveState(state); });
+    budgetMaxInput.addEventListener('blur', () => render());
+  }
+
   root.querySelectorAll('[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => { state.activeTab = btn.getAttribute('data-tab'); AppEngine.saveState(state); render(); });
   });
@@ -683,12 +750,36 @@ function attachHandlers() {
     aptSubmit.addEventListener('click', () => {
       const name = root.querySelector('#mt-apt-name').value.trim();
       const price = root.querySelector('#mt-apt-price').value;
+      const url = root.querySelector('#mt-apt-url').value.trim();
       if (!name || !price) return;
-      state.apartments.push({ name, price });
+      state.apartments.push({ name, price, url });
       AppEngine.saveState(state);
       render();
     });
   }
+
+  const moverAddBtn = root.querySelector('#mover-add-btn');
+  if (moverAddBtn) {
+    moverAddBtn.addEventListener('click', () => {
+      const name = root.querySelector('#mover-name').value.trim();
+      const phone = root.querySelector('#mover-phone').value.trim();
+      const notes = root.querySelector('#mover-notes').value.trim();
+      if (!name) return;
+      state.customMovers.push({ name, phone, notes });
+      AppEngine.saveState(state);
+      render();
+    });
+  }
+
+  root.querySelectorAll('[data-remove-mover]').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.getAttribute('data-remove-mover'), 10);
+      if (!confirm('Remove this mover?')) return;
+      state.customMovers.splice(idx, 1);
+      AppEngine.saveState(state);
+      render();
+    });
+  });
 
   root.querySelectorAll('[data-apt-status]').forEach(btn => {
     btn.addEventListener('click', () => {

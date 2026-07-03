@@ -185,3 +185,11 @@ body { margin: 0; font-family: 'Inter', sans-serif; background-color: var(--bg-a
   .mt-card-body { overflow-x: auto; }
   .mt-apt-form, .mt-spend-form { flex-direction: column; align-items: stretch; }
 }
+
+/* ---- Apartment link chip ---- */
+.mt-apt-link-chip {
+  display: inline-block; font-size: 11px; font-weight: 600; color: var(--accent-primary);
+  background: rgba(0,122,255,0.08); padding: 3px 8px; border-radius: 6px;
+  text-decoration: none; margin-top: 4px;
+}
+.mt-apt-link-chip:hover { background: rgba(0,122,255,0.15); }

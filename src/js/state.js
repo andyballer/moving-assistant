@@ -1,6 +1,6 @@
 window.MovingApp = window.MovingApp || {};
 
-window.MovingApp.APT_STATUSES = ['Visited', 'Applied', 'Rejected', 'Lease Signed'];
+window.MovingApp.APT_STATUSES = ['Inquired', 'Emailed/Called', 'Visited', 'Applied', 'Rejected', 'Lease Signed'];
 window.MovingApp.STORAGE_KEY = 'move-tracker:state:v8';
 
 window.MovingApp.DONATION_CATEGORIES = ['Books', 'Games', 'Clothes', 'Electronics', 'Other'];
@@ -13,7 +13,10 @@ window.MovingApp.MOVERS = [
   { name: 'Roadway Moving', phone: '(212) 812-5240', price: 'Flat-rate quote, mid-to-upper range', desc: 'Reliable full-service standard, dedicated coordinators, binding estimates.' },
   { name: 'FlatRate Moving', phone: '(212) 988-9292', price: '$900-$1,400 for a 1BR local move (flat-rate)', desc: 'Originator of guaranteed flat-rate pricing, no surprise hourly overage.' },
   { name: 'Dumbo Moving & Storage', phone: '(718) 222-8282', price: 'Flat per-job pricing, generally competitive/affordable', desc: 'Well-reviewed, BBB-accredited since 2012, strong if either end is in Brooklyn.' },
-  { name: 'Zip to Zip Moving', phone: '(929) 990-2060', price: 'Avg. ~$678 for a 1BR full-service move', desc: 'Frequently top-rated for in-city moves.' }
+  { name: 'Zip to Zip Moving', phone: '(929) 990-2060', price: 'Avg. ~$678 for a 1BR full-service move', desc: 'Frequently top-rated for in-city moves.' },
+  { name: 'Oz Moving & Storage', phone: '(212) 452-6683', price: 'Mid-to-upper range, hourly or flat-rate', desc: 'Operating since 1993, one of the longest-running NYC movers — full residential, commercial, interstate, and storage.' },
+  { name: 'JP Urban Moving', phone: '(718) 965-1925', price: 'Mid-to-premium, hourly', desc: 'Brooklyn-based, highly rated, experienced with strict NYC building compliance (COI, elevator scheduling) and white-glove/art handling.' },
+  { name: 'Metropolis Moving', phone: '(718) 710-4520', price: 'Transparent hourly pricing, budget-friendly', desc: 'Brooklyn-based, popular with young professionals doing apartment moves; smaller crews, good price-to-service balance.' }
 ];
 
 window.MovingApp.MOVE_TIPS = [
@@ -66,10 +69,13 @@ window.MovingApp.defaultState = function() {
     targetMoveDate: '',
     aptSize: '1br',
     annualIncome: 0,
+    targetBudgetMin: '',
+    targetBudgetMax: '',
     checked: {},
     donations: window.MovingApp.DONATION_CATEGORIES.reduce((acc, c) => ({ ...acc, [c]: [] }), {}),
     spend: [],
     movers: window.MovingApp.MOVERS.reduce((acc, m) => ({ ...acc, [m.name]: false }), {}),
+    customMovers: [],
     apartments: [],
     rooms: window.MovingApp.ROOMS.reduce((acc, r) => ({ ...acc, [r]: 'Not started' }), {}),
     utilities: window.MovingApp.UTILITIES.reduce((acc, u) => ({ ...acc, [u]: { oldCancelDate: '', newStartDate: '' } }), {}),
