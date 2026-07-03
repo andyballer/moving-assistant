@@ -80,6 +80,12 @@ body { margin: 0; font-family: 'Inter', sans-serif; background-color: var(--bg-a
 .mt-mobile-menu-close { background: none; border: none; font-size: 28px; cursor: pointer; color: var(--text-main); }
 
 .mt-mobile-grid-bubbles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 30px; }
+.mt-general-row { grid-template-columns: repeat(2, 1fr); margin-bottom: 10px; }
+.mt-mobile-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 10px; }
+.mt-mobile-column-title { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 10px; }
+.mt-mobile-column .mt-mobile-grid-bubbles { grid-template-columns: 1fr; gap: 10px; margin-bottom: 0; }
+.mt-mobile-column .mt-bubble-item { padding: 12px 10px; font-size: 12.5px; }
+.mt-mobile-column .mt-bubble-icon { font-size: 20px; }
 .mt-bubble-item {
   background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 16px;
   padding: 16px; text-align: center; font-size: 14px; font-weight: 600; cursor: pointer;
@@ -198,25 +204,9 @@ body { margin: 0; font-family: 'Inter', sans-serif; background-color: var(--bg-a
 @media (max-width: 768px) {
   #move-tracker-root { flex-direction: column; height: 100vh; width: 100vw; }
 
-  .mt-sidebar {
-    width: 100%; height: auto; flex-direction: column;
-    padding-bottom: 0; flex-shrink: 0;
-  }
-  .mt-sidebar-top {
-    flex-direction: row; align-items: center; gap: 14px;
-    padding: 14px 16px; overflow-x: auto; flex: none;
-  }
-  .mt-user-badge { flex-shrink: 0; }
-  .mt-user-badge .username { font-size: 16px; }
-  .mt-nav { flex-direction: row; gap: 6px; }
-  .mt-nav button { white-space: nowrap; padding: 8px 12px; font-size: 12.5px; }
-
-  .mt-sidebar > div:last-child {
-    display: flex; flex-direction: row; align-items: center;
-    gap: 8px; padding: 0 16px 12px; overflow-x: auto;
-  }
-  .mt-settings-trigger { width: auto; white-space: nowrap; margin-bottom: 0; padding: 8px 12px; font-size: 12px; }
-  .mt-sidebar-progress { margin-top: 0; padding: 0; flex-shrink: 0; min-width: 120px; }
+  /* Nav + settings collapse into the hamburger menu on mobile; sidebar itself goes away. */
+  .mt-sidebar { display: none; }
+  .mt-hamburger-btn { display: block; }
 
   .mt-main-content { height: auto; flex: 1; overflow: hidden; }
   .mt-header { padding: 16px 16px 14px; flex-wrap: wrap; gap: 10px; }

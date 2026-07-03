@@ -7,18 +7,20 @@ if (!state.activeTab) {
 }
 
 // Global Definitions for Mobile Grid Bubble Mapping Matrix
+// category: 'general' shows above the two columns; 'apartment' = finding a new place;
+// 'moveout' = moving out of the current place.
 const appSections = [
-  { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
-  { id: 'tasks', label: 'Milestone Timeline', icon: '📋' },
-  { id: 'aptsearch', label: 'Market Search', icon: '🔍' },
-  { id: 'apartments', label: 'Apartment Tracker', icon: '🏢' },
-  { id: 'supplies', label: 'Boxes & Supplies', icon: '📦' },
-  { id: 'donations', label: 'Donations Manager', icon: '🤝' },
-  { id: 'spend', label: 'Spending Ledger', icon: '💰' },
-  { id: 'movers', label: 'Moving Companies', icon: '🚛' },
-  { id: 'rooms', label: 'Room Packing Matrix', icon: '🏠' },
-  { id: 'addressutil', label: 'Address & Utilities', icon: '⚡' },
-  { id: 'dayof', label: 'Move Day Survival', icon: '🎯' }
+  { id: 'dashboard', label: 'Dashboard', icon: '🏠', category: 'general' },
+  { id: 'spend', label: 'Spending Ledger', icon: '💰', category: 'general' },
+  { id: 'aptsearch', label: 'Apartment Search Timeline', icon: '🔍', category: 'apartment' },
+  { id: 'apartments', label: 'Apartment Tracker', icon: '🏢', category: 'apartment' },
+  { id: 'tasks', label: 'Move-Out Timeline', icon: '📋', category: 'moveout' },
+  { id: 'supplies', label: 'Boxes & Supplies', icon: '📦', category: 'moveout' },
+  { id: 'donations', label: 'Donations Manager', icon: '🤝', category: 'moveout' },
+  { id: 'movers', label: 'Moving Companies', icon: '🚛', category: 'moveout' },
+  { id: 'rooms', label: 'Room Packing Matrix', icon: '🧳', category: 'moveout' },
+  { id: 'addressutil', label: 'Address & Utilities', icon: '⚡', category: 'moveout' },
+  { id: 'dayof', label: 'Move Day Survival', icon: '🎯', category: 'moveout' }
 ];
 
 // --- CORE ANIMATION ---
@@ -125,18 +127,33 @@ window.openMobileMenu = function() {
   overlay.id = 'mt-mobile-nav-overlay';
   overlay.className = 'mt-mobile-menu-overlay';
 
+  const bubble = sec => `
+    <div class="mt-bubble-item ${state.activeTab === sec.id ? 'active' : ''}" onclick="handleSectionTap('${sec.id}')">
+      <span class="mt-bubble-icon">${sec.icon}</span>
+      <span>${sec.label}</span>
+    </div>
+  `;
+  const generalSecs = appSections.filter(s => s.category === 'general');
+  const aptSecs = appSections.filter(s => s.category === 'apartment');
+  const moveoutSecs = appSections.filter(s => s.category === 'moveout');
+
   overlay.innerHTML = `
     <div class="mt-mobile-menu-header">
       <h2>Navigate Move</h2>
       <button class="mt-mobile-menu-close" onclick="document.getElementById('mt-mobile-nav-overlay').remove()">×</button>
     </div>
-    <div class="mt-mobile-grid-bubbles">
-      ${appSections.map(sec => `
-        <div class="mt-bubble-item ${state.activeTab === sec.id ? 'active' : ''}" onclick="handleSectionTap('${sec.id}')">
-          <span class="mt-bubble-icon">${sec.icon}</span>
-          <span>${sec.label}</span>
-        </div>
-      `).join('')}
+    <div class="mt-mobile-grid-bubbles mt-general-row">
+      ${generalSecs.map(bubble).join('')}
+    </div>
+    <div class="mt-mobile-columns">
+      <div class="mt-mobile-column">
+        <div class="mt-mobile-column-title">🔑 Finding an Apartment</div>
+        <div class="mt-mobile-grid-bubbles">${aptSecs.map(bubble).join('')}</div>
+      </div>
+      <div class="mt-mobile-column">
+        <div class="mt-mobile-column-title">📦 Moving Out</div>
+        <div class="mt-mobile-grid-bubbles">${moveoutSecs.map(bubble).join('')}</div>
+      </div>
     </div>
     <div class="mt-mobile-menu-bottom">
       <div class="mt-progress-meta"><span>COMPLETION METRIC</span><span>${pct}% Done</span></div>
@@ -381,6 +398,21 @@ function renderAptSearch() {
   return renderPhaseList(AppEngine.APT_PHASES);
 }
 
+// Given a listing URL, return a display hostname + a favicon <img>/emoji fallback.
+// Centralized here so the upcoming real-image-preview work only has to change one spot.
+function getListingSourceInfo(url) {
+  if (!url) return { hostname: 'Listing URL', faviconUrl: '🏢' };
+  try {
+    const parsedUrl = new URL(url);
+    return {
+      hostname: parsedUrl.hostname.replace('www.', ''),
+      faviconUrl: `<img src="https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32" alt="favicon" />`
+    };
+  } catch (e) {
+    return { hostname: 'External Reference Link', faviconUrl: '🔗' };
+  }
+}
+
 function renderApartments() {
   const list = state.apartments || [];
   const max = parseFloat(state.targetBudgetMax) || 0;
@@ -393,18 +425,7 @@ function renderApartments() {
     else if (status === 'Rejected') statusClass = 'mt-badge-fail';
     else if (status === 'Lease Signed') statusClass = 'mt-badge-success';
 
-    let hostname = "Listing URL";
-    let faviconUrl = "🏢";
-    if (a.url) {
-      try {
-        const parsedUrl = new URL(a.url);
-        hostname = parsedUrl.hostname.replace('www.', '');
-        faviconUrl = `<img src="https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32" alt="favicon" />`;
-      } catch(e) {
-        hostname = "External Reference Link";
-        faviconUrl = "🔗";
-      }
-    }
+    const { hostname, faviconUrl } = getListingSourceInfo(a.url);
 
     const minRentText = a.minRent ? `$${parseFloat(a.minRent).toLocaleString()}` : "Any";
     const maxRentText = a.maxRent ? `$${parseFloat(a.maxRent).toLocaleString()}` : "Any";
