@@ -8,6 +8,15 @@ window.MovingApp.DONATION_CATEGORIES = ['Books', 'Games', 'Clothes', 'Electronic
 window.MovingApp.ROOMS = ['Kitchen', 'Bedroom', 'Bathroom', 'Closet', 'Living Room', 'Entryway/Storage'];
 window.MovingApp.ROOM_STATUSES = ['Not started', 'In progress', 'Packed'];
 
+window.MovingApp.DONATION_GUIDE = {
+  'Kitchen': ['Duplicate mugs, cups, and utensils', 'Gadgets you forgot you owned', 'Unopened shelf-stable food you will not eat before moving', 'Serving pieces you never reach for'],
+  'Bedroom': ['Extra bedding sets you do not love', 'Decor pillows you only move from chair to bed', 'Lamps or decor that will not fit the next place', 'Old sheets or towels for textile recycling'],
+  'Bathroom': ['Unopened toiletries you will not use', 'Duplicate hair tools', 'Expired products or medications for proper disposal', 'Towels that should become packing padding or textile recycling'],
+  'Closet': ['Clothes not worn in the last year', 'Shoes that hurt or need repairs you will not make', 'Bags, belts, and accessories that no longer fit your style', 'Freebie totes and duplicate hangers'],
+  'Living Room': ['Books you will not reread', 'Games with missing pieces', 'Extra cables and chargers you cannot identify', 'Decor that does not match the next apartment'],
+  'Entryway/Storage': ['Old boxes and mystery storage', 'Unused sports gear', 'Expired documents for shredding', 'Duplicate tools or hardware']
+};
+
 // Curated per-room packing guide. Items are ordered most -> least important/complex.
 // action tags: 'bring' | 'buy-new' | 'donate' | 'optional' (drives the little colored pill in the UI)
 window.MovingApp.ROOM_PACKING_GUIDE = {
@@ -120,7 +129,7 @@ window.MovingApp.MOVER_TIPPING_GUIDE = {
 };
 
 window.MovingApp.TIMELINE_DATA_MATRIX = [
-  { id: '8wk', weeksOut: 8, label: '8 Weeks: Strategy', items: ['Calculate max rent: (Annual Income / 40) [10m]', 'Research 3 movers: Compare reviews/services [45m]', 'Get COI requirements from both building managements [15m]', 'Categorize: Sort 3 donation bags for pickup [1h]'] },
+  { id: '8wk', weeksOut: 8, label: '8 Weeks: Strategy', items: ['Set a target rent range you would actually feel okay paying [10m]', 'Research 3 movers: Compare reviews/services [45m]', 'Get COI requirements from both building managements [15m]', 'Start one donation bag from the room suggestions [30m]'] },
   { id: '4wk', weeksOut: 4, label: '4 Weeks: Logistics', items: ['Confirm elevator reservation slot [15m]', 'Order supplies: 30 boxes, tape, markers [15m]', 'Notify current landlord (email/portal) [10m]', 'Schedule internet setup for new place [20m]'] },
   { id: '2wk', weeksOut: 2, label: '2 Weeks: Preparation', items: ['Submit COI to new building management [20m]', 'Book bed disassembly help (TaskRabbit/friend) [30m]', 'Pack non-essentials: Books/Off-season clothes [2h]', 'File USPS mail forwarding [15m]'] },
   { id: 'movingwk', weeksOut: 1, label: '1 Week: Launch Prep', items: ['Confirm movers: Call to verify arrival window [15m]', 'Pack "Essentials Box": Meds, chargers, documents, 2 days clothes [1h]', 'Defrost freezer and clean fridge [45m]', 'Photo record: Floor/wall condition for deposit return [30m]'] },
@@ -264,14 +273,6 @@ window.MovingApp.DEFAULT_BOX_PLAN = [
   }
 ];
 
-window.MovingApp.getBudgetLimits = function(annualIncome) {
-  const income = parseFloat(annualIncome) || 0;
-  return {
-    max40xRent: Math.round(income / 40),
-    comfortCeiling: Math.round(income * 0.022)
-  };
-};
-
 window.MovingApp.calculateSuppliesConfig = function(size) {
   const matrix = {
     'studio': { small: 15, medium: 10, large: 5, tape: 2, paper: 1 },
@@ -290,7 +291,6 @@ window.MovingApp.defaultState = function() {
     aptSize: '1br',
     city: '',
     neighborhoods: [...window.MovingApp.DEFAULT_NEIGHBORHOODS],
-    annualIncome: 0,
     targetBudgetMin: '',
     targetBudgetMax: '',
     checked: {},
@@ -351,9 +351,9 @@ window.MovingApp.sanitizeState = function(input) {
   merged.neighborhoods = Array.isArray(input.neighborhoods)
     ? input.neighborhoods.map(String).map(x => x.trim()).filter(Boolean).slice(0, 12)
     : [...window.MovingApp.DEFAULT_NEIGHBORHOODS];
-  merged.annualIncome = Number(input.annualIncome) || 0;
   merged.targetBudgetMin = input.targetBudgetMin || '';
   merged.targetBudgetMax = input.targetBudgetMax || '';
+  delete merged.annualIncome;
   merged.checked = (input.checked && typeof input.checked === 'object' && !Array.isArray(input.checked)) ? input.checked : {};
   merged.donations = window.MovingApp.DONATION_CATEGORIES.reduce((acc, cat) => {
     const items = input.donations && Array.isArray(input.donations[cat]) ? input.donations[cat] : [];
@@ -415,8 +415,8 @@ window.MovingApp.sanitizeState = function(input) {
   merged.backupExportedAt = typeof input.backupExportedAt === 'string' ? input.backupExportedAt : '';
   merged.celebrationLog = (input.celebrationLog && typeof input.celebrationLog === 'object' && !Array.isArray(input.celebrationLog)) ? input.celebrationLog : {};
   merged.notes = typeof input.notes === 'string' ? input.notes : '';
-  const validTabs = ['dashboard', 'aptsearch', 'apartments', 'tasks', 'supplies', 'boxes', 'donations', 'movers', 'rooms', 'addressutil', 'dayof'];
-  merged.activeTab = validTabs.includes(input.activeTab) ? input.activeTab : 'dashboard';
+  const validTabs = ['dashboard', 'aptsearch', 'apartments', 'tasks', 'supplies', 'boxes', 'movers', 'rooms', 'addressutil', 'dayof'];
+  merged.activeTab = input.activeTab === 'donations' ? 'rooms' : (validTabs.includes(input.activeTab) ? input.activeTab : 'dashboard');
   merged.showWizardOverride = !!input.showWizardOverride;
   return merged;
 };

@@ -15,10 +15,9 @@ const appSections = [
   { id: 'apartments', label: 'Apartment Tracker', icon: '🏢', category: 'apartment' },
   { id: 'tasks', label: 'Move Timeline', icon: '📋', category: 'moveout' },
   { id: 'supplies', label: 'Supplies', icon: '📦', category: 'moveout' },
-  { id: 'boxes', label: 'Box Inventory', icon: '🏷️', category: 'moveout' },
-  { id: 'donations', label: 'Donations', icon: '🤝', category: 'moveout' },
-  { id: 'movers', label: 'Movers', icon: '🚛', category: 'moveout' },
   { id: 'rooms', label: 'Room Packing', icon: '🧳', category: 'moveout' },
+  { id: 'boxes', label: 'Box Inventory', icon: '🏷️', category: 'moveout' },
+  { id: 'movers', label: 'Movers', icon: '🚛', category: 'moveout' },
   { id: 'addressutil', label: 'Address & Utilities', icon: '⚡', category: 'moveout' },
   { id: 'dayof', label: 'Move Day', icon: '🎯', category: 'moveout' }
 ];
@@ -97,7 +96,6 @@ function isAllDone() {
 }
 
 function getFunStat() {
-  const donationCount = Object.values(state.donations).reduce((sum, arr) => sum + arr.length, 0);
   const packedRooms = AppEngine.ROOMS.filter(r => state.rooms[r] === 'Packed').length;
   const days = daysUntilMove();
   if (packedRooms > 0 && packedRooms < AppEngine.ROOMS.length) {
@@ -106,13 +104,10 @@ function getFunStat() {
   if (packedRooms === AppEngine.ROOMS.length && AppEngine.ROOMS.length > 0) {
     return `Every room packed. You are basically a moving professional now.`;
   }
-  if (donationCount > 0) {
-    return `You've donated ${donationCount} item${donationCount === 1 ? '' : 's'} so far — future you says thanks.`;
-  }
   if (days > 0 && days <= 7) {
     return `${days} day${days === 1 ? '' : 's'} to go. This is the home stretch.`;
   }
-  return `Every box you pack now is one less thing to think about on move day.`;
+  return `Use the room suggestions to donate before you pack. Every item that leaves now is one less item to move.`;
 }
 
 // --- MOBILE INTERACTION WINDOW HOOKS ---
@@ -146,7 +141,7 @@ window.openMobileMenu = function() {
     <div class="mt-mobile-grid-bubbles mt-general-row">
       ${generalSecs.map(bubble).join('')}
     </div>
-    <div class="mt-mobile-columns">
+    <div class="mt-mobile-groups">
       <div class="mt-mobile-column">
         <div class="mt-mobile-column-title">🔑 Finding an Apartment</div>
         <div class="mt-mobile-grid-bubbles">${aptSecs.map(bubble).join('')}</div>
@@ -497,6 +492,11 @@ function renderSidebar() {
   const total = totalTaskCount();
   const done = doneTaskCount();
   const pct = total ? Math.round((done / total) * 100) : 0;
+  const groupedSections = [
+    { title: 'Home', sections: appSections.filter(s => s.category === 'general') },
+    { title: 'Finding an Apartment', sections: appSections.filter(s => s.category === 'apartment') },
+    { title: 'Moving Out', sections: appSections.filter(s => s.category === 'moveout') }
+  ];
 
   return `
     <div class="mt-sidebar">
@@ -506,7 +506,12 @@ function renderSidebar() {
           <div class="username">${esc(state.userName || 'Friend')}</div>
         </div>
         <div class="mt-nav">
-          ${appSections.map(sec => `<button data-tab="${sec.id}" class="${state.activeTab === sec.id ? 'active' : ''}">${sec.icon} ${sec.label}</button>`).join('')}
+          ${groupedSections.map(group => `
+            <div class="mt-nav-group">
+              <div class="mt-nav-heading">${esc(group.title)}</div>
+              ${group.sections.map(sec => `<button data-tab="${sec.id}" class="${state.activeTab === sec.id ? 'active' : ''}">${sec.icon} ${sec.label}</button>`).join('')}
+            </div>
+          `).join('')}
         </div>
       </div>
       <div>
@@ -744,7 +749,6 @@ function compressImageFile(file, maxWidth) {
 
 function renderApartments() {
   const list = state.apartments || [];
-  const max = parseFloat(state.targetBudgetMax) || 0;
   const filter = state.aptFilter || 'all';
   const visibleList = filter === 'favorites' ? list.filter(a => a.favorite) : list;
 
@@ -830,26 +834,12 @@ function renderApartments() {
 
   return `
     <div class="mt-income-wrapper">
-      <label>Annual Income (for a rough budget check):</label>
-      <input type="number" id="mt-income-input" value="${state.annualIncome || ''}" />
-    </div>
-    <div class="mt-income-wrapper">
       <label>Target Budget Range ($/mo):</label>
       <div style="display:flex; gap:10px; align-items:center; margin-bottom: 12px;">
         ${renderRentDropdownHtml('mt-apt-min-rent', 'Min Target Rent', state.targetBudgetMin || '')}
         <span style="color: var(--text-muted); font-weight:600;">–</span>
         ${renderRentDropdownHtml('mt-apt-max-rent', 'Max Target Rent', state.targetBudgetMax || '')}
       </div>
-      ${max > 0 ? `
-        <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 8px;">
-          For a $${max.toLocaleString()}/mo max, most landlords want to see an annual income of at least
-          <strong>$${(max * 40).toLocaleString()}</strong> (the standard 40x rent rule).
-          ${state.annualIncome ? (state.annualIncome >= max * 40
-            ? ' Your current income clears that.'
-            : ` That's about $${((max * 40) - state.annualIncome).toLocaleString()} above your current income — a guarantor may be worth looking into.`)
-            : ''}
-        </p>
-      ` : ''}
     </div>
     <div class="mt-apt-form" style="display:flex; flex-direction:column; gap:10px; margin-top: 20px;">
       <input type="text" id="mt-apt-name" placeholder="Address / Building Name" style="width:100%; box-sizing:border-box;" />
@@ -906,27 +896,6 @@ function renderSupplies() {
   `;
 }
 
-function renderDonations() {
-  const cats = AppEngine.DONATION_CATEGORIES.map(cat => {
-    const items = state.donations[cat] || [];
-    return `
-      <div class="mt-cat">
-        <h4><span>${esc(cat)}</span><span style="color:var(--accent-primary); font-family:monospace; font-weight:700; margin-left:8px;">${items.length}</span></h4>
-        <ul>
-          ${items.length ? items.map((item, i) => `
-            <li><span>${esc(item)}</span><button data-don-remove="${esc(cat)}|${i}">×</button></li>
-          `).join('') : '<li class="mt-empty">Empty</li>'}
-        </ul>
-        <div class="mt-cat-add">
-          <input type="text" placeholder="Add item..." data-don-input="${esc(cat)}" />
-          <button data-don-add="${esc(cat)}">+</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-  return `<div class="mt-cat-grid">${cats}</div>`;
-}
-
 function renderMovers() {
   return `
     <div class="mt-card" style="margin-bottom: 20px;">
@@ -978,9 +947,33 @@ const ROOM_ICONS = { 'Kitchen': '🍳', 'Bedroom': '🛏️', 'Bathroom': '🚿'
 const ACTION_TAGS = {
   'bring': { label: 'Bring', color: '#2f6fed' },
   'buy-new': { label: 'Buy new at destination', color: '#c9832f' },
-  'donate': { label: 'Consider donating', color: '#3f9e5e' },
+  'donate': { label: 'Donate / purge', color: '#3f9e5e' },
   'optional': { label: 'Optional', color: '#8a8a94' }
 };
+
+function renderDonationSuggestions() {
+  const suggestions = AppEngine.DONATION_GUIDE || {};
+  const rooms = AppEngine.ROOMS.filter(room => Array.isArray(suggestions[room]) && suggestions[room].length);
+  return `
+    <div class="mt-card mt-donation-sweep">
+      <div class="mt-card-header">
+        <div>
+          <h3>Donation sweep</h3>
+          <p class="mt-muted-copy" style="margin:4px 0 0;">No item-by-item logging. Use these as default purge prompts while you pack each room.</p>
+        </div>
+        <button class="mt-secondary-btn" data-tab-jump="boxes">Open box plan</button>
+      </div>
+      <div class="mt-donation-grid">
+        ${rooms.map(room => `
+          <div class="mt-donation-room">
+            <h4>${esc(ROOM_ICONS[room] || '📦')} ${esc(room)}</h4>
+            <ul>${suggestions[room].map(item => `<li>${esc(item)}</li>`).join('')}</ul>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
 
 function renderRooms() {
   const cards = AppEngine.ROOMS.map(room => {
@@ -1021,7 +1014,13 @@ function renderRooms() {
     `;
   }).join('');
 
-  return `<div class="mt-mover-grid" style="grid-template-columns: 1fr;">${cards}</div>`;
+  return `
+    <div class="mt-alert-box">
+      <strong>Room flow:</strong> purge first, pack second, then use Box Inventory for the final box labels and contents.
+    </div>
+    ${renderDonationSuggestions()}
+    <div class="mt-mover-grid" style="grid-template-columns: 1fr;">${cards}</div>
+  `;
 }
 
 
@@ -1391,7 +1390,6 @@ function render() {
   else if (state.activeTab === 'apartments') body = renderApartments();
   else if (state.activeTab === 'supplies') body = renderSupplies();
   else if (state.activeTab === 'boxes') body = renderBoxes();
-  else if (state.activeTab === 'donations') body = renderDonations();
   else if (state.activeTab === 'movers') body = renderMovers();
   else if (state.activeTab === 'rooms') body = renderRooms();
   else if (state.activeTab === 'addressutil') body = renderAddressUtil();
@@ -1461,12 +1459,6 @@ function attachHandlers() {
     });
   }
 
-  const incomeInput = root.querySelector('#mt-income-input');
-  if (incomeInput) {
-    incomeInput.addEventListener('input', () => { state.annualIncome = parseFloat(incomeInput.value) || 0; AppEngine.saveState(state); });
-    incomeInput.addEventListener('blur', () => render());
-  }
-
   // Apartment Tracker budget listeners connected to the drop option selectors
   const budgetMinInput = root.querySelector('#mt-apt-min-rent');
   if (budgetMinInput) {
@@ -1480,6 +1472,14 @@ function attachHandlers() {
 
   root.querySelectorAll('.mt-nav [data-tab]').forEach(btn => {
     btn.addEventListener('click', () => { state.activeTab = btn.getAttribute('data-tab'); AppEngine.saveState(state); render(); });
+  });
+
+  root.querySelectorAll('[data-tab-jump]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.activeTab = btn.getAttribute('data-tab-jump') || 'dashboard';
+      AppEngine.saveState(state);
+      render();
+    });
   });
 
   root.querySelectorAll('[data-focus-open]').forEach(btn => {
@@ -1524,28 +1524,6 @@ function attachHandlers() {
         checkPhaseCelebration(key);
         maybeCelebrateProgress(beforePct);
       }
-      render();
-    });
-  });
-
-  root.querySelectorAll('[data-don-add]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const cat = btn.getAttribute('data-don-add');
-      const inputEl = root.querySelector(`[data-don-input="${CSS.escape(cat)}"]`);
-      const val = inputEl ? inputEl.value.trim() : '';
-      if (!val) return;
-      if (!state.donations[cat]) state.donations[cat] = [];
-      state.donations[cat].push(val);
-      AppEngine.saveState(state);
-      render();
-    });
-  });
-
-  root.querySelectorAll('[data-don-remove]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const [cat, idxStr] = btn.getAttribute('data-don-remove').split('|');
-      state.donations[cat].splice(parseInt(idxStr, 10), 1);
-      AppEngine.saveState(state);
       render();
     });
   });
