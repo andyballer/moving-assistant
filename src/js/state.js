@@ -88,7 +88,7 @@ window.MovingApp.MOVE_DAY_STAGES = [
   {
     title: 'Final sweep before leaving',
     emoji: '🔦',
-    items: ['Open every drawer, cabinet, closet, and medicine cabinet', 'Check outlets for chargers and extension cords', 'Take final condition photos for deposit protection', 'Return keys, fobs, and garage/elevator passes as required', 'Text/email building management that you are fully out']
+    items: ['Open every drawer, cabinet, closet, and medicine cabinet', 'Check outlets for chargers and extension cords', 'Take final condition photos/video for deposit protection', 'Return keys, fobs, and garage/elevator passes as required', 'Email/text building management that you are fully out and include your forwarding address']
   },
   {
     title: 'At the new place',
@@ -118,7 +118,19 @@ window.MovingApp.MOVE_TIPS = [
   "Don't schedule anything the day after move day — give yourself a buffer",
   'Keep phone chargers, medications, and important documents on your person, not in a box',
   'Label the outside by room + box number; keep the detailed contents in the app so movers are not reading your sock inventory',
+  'For your deposit: photograph every room after it is empty, including inside appliances, cabinets, closets, floors, windows, and repaired wall spots',
   'Take a deep breath — everyone hates moving, this feeling is normal and temporary'
+];
+
+window.MovingApp.SAVINGS_PLAYS = [
+  { title: 'Get 3-5 written mover quotes before booking', detail: 'Written quotes make it easier to compare hourly minimums, travel time, stairs, COI fees, supplies, cancellation terms, and whether the estimate is binding or can grow.' },
+  { title: 'Book movers before the date gets scarce', detail: 'Waiting can push you into worse time slots, pricier crews, or companies with weaker reviews. The 6-week timeline phase is where booking belongs.' },
+  { title: 'Reduce mover hours before move day', detail: 'Packing boxes fully, labeling rooms, reserving elevators, clearing pathways, and disassembling simple furniture can shave billable time.' },
+  { title: 'Protect your security deposit', detail: 'Lease check, allowed hole repair, cleaning, empty-apartment photos, key return proof, and forwarding-address email can prevent avoidable deductions.' },
+  { title: 'Use the box plan to avoid duplicate purchases', detail: 'Searchable boxes make it less likely you rebuy chargers, tools, toiletries, kitchen basics, or cleaning supplies you already packed.' },
+  { title: 'Donate or sell before the final week', detail: 'Early donation/resale avoids paying movers to transport things you do not want and prevents last-minute trash/removal costs.' },
+  { title: 'Borrow or reuse boxes where possible', detail: 'Uniform boxes are helpful, but free boxes from neighbors, work, or recent deliveries can cut supply cost if they are sturdy and clean.' },
+  { title: 'Avoid first-night convenience spending', detail: 'Open-first boxes and food planning prevent expensive emergency runs for toiletries, chargers, bedding, tools, and takeout decisions.' }
 ];
 
 window.MovingApp.MOVER_TIPPING_GUIDE = {
@@ -129,17 +141,18 @@ window.MovingApp.MOVER_TIPPING_GUIDE = {
 };
 
 window.MovingApp.TIMELINE_DATA_MATRIX = [
-  { id: '8wk', weeksOut: 8, label: '8 Weeks: Strategy', items: ['Set a target rent range you would actually feel okay paying [10m]', 'Research 3 movers: Compare reviews/services [45m]', 'Get COI requirements from both building managements [15m]', 'Start one donation bag from the room suggestions [30m]'] },
-  { id: '4wk', weeksOut: 4, label: '4 Weeks: Logistics', items: ['Confirm elevator reservation slot [15m]', 'Order supplies: 30 boxes, tape, markers [15m]', 'Notify current landlord (email/portal) [10m]', 'Schedule internet setup for new place [20m]'] },
-  { id: '2wk', weeksOut: 2, label: '2 Weeks: Preparation', items: ['Submit COI to new building management [20m]', 'Book bed disassembly help (TaskRabbit/friend) [30m]', 'Pack non-essentials: Books/Off-season clothes [2h]', 'File USPS mail forwarding [15m]'] },
-  { id: 'movingwk', weeksOut: 1, label: '1 Week: Launch Prep', items: ['Confirm movers: Call to verify arrival window [15m]', 'Pack "Essentials Box": Meds, chargers, documents, 2 days clothes [1h]', 'Defrost freezer and clean fridge [45m]', 'Photo record: Floor/wall condition for deposit return [30m]'] },
-  { id: 'moveday', weeksOut: 0, label: 'Move Day: Execution', items: ['Final walkthrough: Check drawers/cabinets [20m]', 'Hand off keys to management [10m]', 'Check-in: Elevator access with new Super [10m]', 'Unpack: Essentials box and bedding [1h]'] }
+  { id: '8wk', weeksOut: 8, label: '8 Weeks: Set the Plan', items: ['Set a target rent range you would actually feel okay paying [10m]', 'Fill in the Savings estimate: deposit, mover rate, reused boxes, duplicate buys [10m]', 'Request written quotes from 3-5 movers for your move date or target week [45m]', 'Ask both buildings for moving rules: elevator hours, COI wording, loading dock, fees [20m]', 'Review your lease for move-out rules, notice deadline, cleaning requirements, and deposit return process [20m]', 'Start one donation bag from the room suggestions [30m]'] },
+  { id: '6wk', weeksOut: 6, label: '6 Weeks: Book the Big Pieces', items: ['Book the mover once your date/window is realistic; get written confirmation and deposit receipt [30m]', 'Send the booked mover both buildings\' COI instructions and ask them to issue the certificate [15m]', 'Schedule first donation pickup/dropoff so the first bag actually leaves [15m]', 'Reserve freight elevator or loading slot if either building allows early booking [20m]', 'Ask building management what repairs you may do yourself: nail holes, paint touch-ups, wall anchors [10m]'] },
+  { id: '4wk', weeksOut: 4, label: '4 Weeks: Lock Logistics', items: ['Confirm elevator reservation slot with current and new buildings [15m]', 'Order supplies: boxes, tape, markers, labels, packing paper [20m]', 'Buy deposit-repair basics: spackle, putty knife, sanding sponge, magic erasers, matching touch-up paint if allowed [25m]', 'Notify current landlord or building management in writing [10m]', 'Schedule internet setup for the new place [20m]', 'Confirm the mover sent the COI or gave you a copy to forward [10m]'] },
+  { id: '2wk', weeksOut: 2, label: '2 Weeks: Approvals & Non-Essentials', items: ['Forward the mover COI to building management and ask for written approval [20m]', 'Book bed disassembly help if needed (TaskRabbit/friend/mover add-on) [30m]', 'Do a second donation dropoff/pickup before packing accelerates [45m]', 'Patch small nail holes and wall-anchor holes only if your lease/building allows it [45m]', 'Pack non-essentials: books, decor, off-season clothes, storage [2h]', 'File USPS mail forwarding [15m]'] },
+  { id: 'movingwk', weeksOut: 1, label: '1 Week: Launch Prep', items: ['Call movers to confirm arrival window, crew size, truck access, elevator time, and COI approval [15m]', 'Pack "open first" essentials: meds, chargers, documents, toiletries, 2 days clothes [1h]', 'Defrost freezer and clean fridge [45m]', 'Touch up allowed wall repairs after spackle dries; skip repainting whole walls unless required [45m]', 'Clean appliances, bathroom, cabinets, floors, and windowsills for deposit return [2h]', 'Finish final donation/trash run so it does not ride in the truck [45m]'] },
+  { id: 'moveday', weeksOut: 0, label: 'Move Day: Execution', items: ['Final walkthrough: check every drawer, cabinet, closet, and outlet [20m]', 'Take empty-apartment photos/video: walls, floors, appliances, bathroom, cabinets, windows, keys/fobs [20m]', 'Hand off keys to current building management and get written confirmation if possible [10m]', 'Send forwarding address and deposit return request to landlord/building management [10m]', 'Check in with new super/doorman for elevator and access [10m]', 'Direct boxes by room before they become a cardboard mountain [30m]', 'Unpack open-first boxes and bedding [1h]'] }
 ];
 
 window.MovingApp.APT_PHASES = [
   { id: 'apt-t60', weeksOut: 8, label: 'Start the hunt', items: ['Define budget ceiling, must-haves, and deal-breakers', 'Set up alerts on StreetEasy, Zillow, Renthop, or your local listing sites', 'Start touring — aim for 3–5 viewings per week once listings are fresh'] },
   { id: 'apt-t30', weeksOut: 4, label: 'Apply fast', items: ['Submit applications for top choices', 'Build renter resume: pay stubs, employment letter, bank statements, ID', 'Watch fees carefully — NYC application/credit checks are generally capped at $20'] },
-  { id: 'apt-t14', weeksOut: 2, label: 'Lock it down', items: ['Sign lease & pay security deposit + first month', 'Submit COI to new building if required', 'Reserve freight elevator for move day'] }
+  { id: 'apt-t14', weeksOut: 2, label: 'Lock it down', items: ['Sign lease & pay security deposit + first month', 'Ask the new building whether movers need a COI (Certificate of Insurance)', 'Reserve freight elevator for move day'] }
 ];
 
 window.MovingApp.APT_HUNT_GUIDES = [
@@ -160,8 +173,31 @@ window.MovingApp.APT_HUNT_GUIDES = [
     title: 'Scam radar',
     emoji: '👻',
     items: ['Be skeptical of suspiciously cheap listings', 'Never wire money before seeing a place', 'Watch pending listings that may come back', 'Verify who any broker represents']
+  },
+  {
+    id: 'outreach-timing',
+    title: 'Outreach timing',
+    emoji: '⏱️',
+    items: ['Check new listings in the morning, at lunch, and late afternoon on active search days', 'Message immediately when a serious fit appears; good rentals often reward speed', 'Call during business hours if the listing includes a phone number', 'If no response, follow up once the same day and once the next morning']
   }
 ];
+
+window.MovingApp.APT_OUTREACH_GUIDE = {
+  bestTimes: [
+    'Best daily rhythm: scan listings before work, again around lunch, and once around 4-6pm.',
+    'Best response window: contact the agent within the first hour after you notice a strong listing.',
+    'Best call window: late morning or early afternoon on weekdays, when agents are more likely to be between showings.',
+    'Weekend tip: if a listing goes live before an open house, message immediately and ask for the earliest showing slot.'
+  ],
+  followUp: [
+    'No reply after 2-4 hours: send one short follow-up with your availability.',
+    'No reply by next morning: call once, then move on unless the apartment is unusually perfect.',
+    'If they ask for documents, reply quickly with your renter packet ready.',
+    'If the unit is gone, ask whether they have anything similar coming up.'
+  ],
+  emailTemplate: `Subject: Interested in [Apartment Address] - available to view [today/tomorrow]\n\nHi [Agent Name],\n\nI saw the listing for [Apartment Address] and I am very interested. My target move date is [Move Date], my budget is [Budget Range], and I can view it [2-3 specific time windows].\n\nA few quick details: [number of occupants], [pets/no pets], ready with application documents, and able to move quickly if it is a fit.\n\nIs the apartment still available, and what is the earliest showing time?\n\nThanks,\n[Your Name]\n[Phone Number]`,
+  phoneScript: `Hi, I am calling about [Apartment Address]. Is it still available?\n\nIf yes: Great. What is the earliest showing slot? I am ready with documents and can move quickly if it is a fit.\n\nIf unavailable: Thanks for letting me know. Do you have anything similar in [neighborhoods], around [budget], for [move date]?`
+};
 
 window.MovingApp.DEFAULT_NEIGHBORHOODS = ['Gramercy', 'Flatiron', 'Murray Hill'];
 
@@ -317,6 +353,7 @@ window.MovingApp.defaultState = function() {
     } }), {}),
     contacts: { movers: '', doorman: '', newSuper: '', emergency: '' },
     moverTip: { crewSize: 3, hours: 4, rate: 8, service: 'good' },
+    savings: { depositAmount: '', moverHourlyRate: '', avoidedMoverHours: '1', reusedBoxes: '', avoidedDuplicateBuys: '' },
     backupExportedAt: '',
     celebrationLog: {},
     notes: '',
@@ -412,10 +449,18 @@ window.MovingApp.sanitizeState = function(input) {
     rate: Math.max(0, Math.min(50, parseFloat(tip.rate) || 8)),
     service: ['okay', 'good', 'great'].includes(tip.service) ? tip.service : 'good'
   };
+  const savings = input.savings && typeof input.savings === 'object' ? input.savings : {};
+  merged.savings = {
+    depositAmount: savings.depositAmount || '',
+    moverHourlyRate: savings.moverHourlyRate || '',
+    avoidedMoverHours: savings.avoidedMoverHours || '1',
+    reusedBoxes: savings.reusedBoxes || '',
+    avoidedDuplicateBuys: savings.avoidedDuplicateBuys || ''
+  };
   merged.backupExportedAt = typeof input.backupExportedAt === 'string' ? input.backupExportedAt : '';
   merged.celebrationLog = (input.celebrationLog && typeof input.celebrationLog === 'object' && !Array.isArray(input.celebrationLog)) ? input.celebrationLog : {};
   merged.notes = typeof input.notes === 'string' ? input.notes : '';
-  const validTabs = ['dashboard', 'aptsearch', 'apartments', 'tasks', 'supplies', 'boxes', 'movers', 'rooms', 'addressutil', 'dayof'];
+  const validTabs = ['dashboard', 'savings', 'aptsearch', 'apartments', 'tasks', 'supplies', 'boxes', 'movers', 'rooms', 'addressutil', 'dayof'];
   merged.activeTab = input.activeTab === 'donations' ? 'rooms' : (validTabs.includes(input.activeTab) ? input.activeTab : 'dashboard');
   merged.showWizardOverride = !!input.showWizardOverride;
   return merged;

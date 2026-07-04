@@ -11,6 +11,7 @@ if (!state.activeTab) {
 // 'moveout' = moving out of the current place.
 const appSections = [
   { id: 'dashboard', label: 'Dashboard', icon: '🏠', category: 'general' },
+  { id: 'savings', label: 'Savings', icon: '💵', category: 'general' },
   { id: 'aptsearch', label: 'Apartment Hunt', icon: '🔍', category: 'apartment' },
   { id: 'apartments', label: 'Apartment Tracker', icon: '🏢', category: 'apartment' },
   { id: 'tasks', label: 'Move Timeline', icon: '📋', category: 'moveout' },
@@ -30,11 +31,21 @@ function playWelcomeAnimation() {
   overlay.id = 'mt-welcome-overlay';
   
   overlay.innerHTML = `
-    <div class="truck-wrapper">
-      <img src="src/assets/moving-truck.webp" class="mt-truck-img" alt="Moving Truck" onerror="console.error('IMAGE FAILED TO LOAD: Check your local folder directory structure')" />
+    <div class="mt-welcome-scene">
+      <div class="mt-road"></div>
+      <div class="mt-house" aria-hidden="true">
+        <div class="mt-house-roof"></div>
+        <div class="mt-house-body">
+          <span class="mt-house-window window-left"></span>
+          <span class="mt-house-window window-right"></span>
+          <span class="mt-house-door"></span>
+        </div>
+      </div>
+      <img src="src/assets/moving-truck-clean.png" class="mt-truck-img" alt="Moving Truck" onerror="console.error('IMAGE FAILED TO LOAD: Check your local folder directory structure')" />
+      <div class="mt-ground-box box-left-large" aria-hidden="true">📦</div>
+      <div class="mt-ground-box box-left-mid" aria-hidden="true">📦</div>
       <div class="mt-box">📦</div>
     </div>
-    <div class="mt-road"></div> 
     <div class="welcome-content">
       <h1 style="font-size: 48px; font-weight: 800; margin-bottom: 10px;">Moving Assistant</h1>
       <p style="color: var(--text-muted); font-size: 20px;">Welcome back, ${esc(state.userName || 'friend')}.</p>
@@ -206,6 +217,7 @@ function getKnownCheckKeys() {
   (AppEngine.APT_HUNT_GUIDES || []).forEach(guide => guide.items.forEach((_, i) => keys.push(`apt-guide-${guide.id}-${i}`)));
   AppEngine.SUPPLIES.forEach((_, i) => keys.push('supply-' + i));
   AppEngine.ADDRESS_CHANGES.forEach((_, i) => keys.push('addr-' + i));
+  (AppEngine.SAVINGS_PLAYS || []).forEach((_, i) => keys.push('saving-' + i));
   (AppEngine.MOVE_DAY_STAGES || []).forEach(stage => {
     stage.items.forEach((_, i) => keys.push('dayof-' + stage.title.replace(/\W+/g, '-').toLowerCase() + '-' + i));
   });
@@ -539,6 +551,7 @@ function renderDashboard() {
   const openFirstCount = (state.boxes || []).filter(b => b.openFirst && b.status !== 'unpacked').length;
   const utilitiesDone = AppEngine.UTILITIES.filter(u => (state.utilities[u] || {}).status === 'done').length;
   const backupText = state.backupExportedAt ? `Last backup: ${new Date(state.backupExportedAt).toLocaleDateString()}` : 'No backup yet';
+  const savings = estimateSavings();
 
   return `
     <div style="padding: 10px 0;">
@@ -583,13 +596,77 @@ function renderDashboard() {
           <div class="mt-metric-label">Boxes logged</div>
         </div>
         <div class="mt-card" style="padding: 20px; margin:0; text-align:center;">
-          <div style="font-size: 28px; font-weight: 800; color:var(--text-main);">${utilitiesDone}/${AppEngine.UTILITIES.length}</div>
-          <div class="mt-metric-label">Utilities done</div>
+          <div style="font-size: 28px; font-weight: 800; color:var(--text-main);">${savings.hasInputs ? `$${savings.low.toLocaleString()}–$${savings.high.toLocaleString()}` : 'Add details'}</div>
+          <div class="mt-metric-label">Avoidable costs</div>
         </div>
       </div>
 
       <div class="mt-card" style="padding: 16px 20px; background: rgba(0,122,255,0.04); border-color: rgba(0,122,255,0.12); margin:20px 0 0;">
         <p style="margin: 0; font-size: 13.5px; font-weight: 600; text-align:center; color: var(--text-main);">${esc(getFunStat())}${openFirstCount ? ` · ${openFirstCount} open-first box${openFirstCount === 1 ? '' : 'es'} should stay easy to grab.` : ''}</p>
+      </div>
+    </div>
+  `;
+}
+
+function estimateSavings() {
+  const s = state.savings || {};
+  const deposit = Math.max(0, parseFloat(s.depositAmount) || 0);
+  const moverHourlyRate = Math.max(0, parseFloat(s.moverHourlyRate) || 0);
+  const avoidedMoverHours = Math.max(0, parseFloat(s.avoidedMoverHours) || 0);
+  const reusedBoxes = Math.max(0, parseInt(s.reusedBoxes, 10) || 0);
+  const avoidedDuplicateBuys = Math.max(0, parseFloat(s.avoidedDuplicateBuys) || 0);
+  const hasInputs = deposit > 0 || moverHourlyRate > 0 || reusedBoxes > 0 || avoidedDuplicateBuys > 0;
+  const depositLow = Math.round(deposit * 0.1);
+  const depositHigh = Math.round(deposit * 0.5);
+  const moverSavings = Math.round(moverHourlyRate * avoidedMoverHours);
+  const boxSavings = Math.round(reusedBoxes * 2.5);
+  const low = depositLow + moverSavings + boxSavings + avoidedDuplicateBuys;
+  const high = depositHigh + moverSavings + boxSavings + avoidedDuplicateBuys;
+  return { low, high, depositLow, depositHigh, moverSavings, boxSavings, avoidedDuplicateBuys, hasInputs };
+}
+
+function renderSavings() {
+  const s = state.savings || {};
+  const savings = estimateSavings();
+  const plays = AppEngine.SAVINGS_PLAYS || [];
+  return `
+    <div class="mt-alert-box">
+      <strong>The money thesis:</strong> this app saves money by preventing avoidable charges: mover overtime, duplicate supply runs, lost deposit deductions, missed donation/resale windows, and last-minute convenience purchases.
+    </div>
+    <div class="mt-dashboard-metrics">
+      <div class="mt-card" style="padding:18px; margin:0; text-align:center;"><div class="mt-box-big">$${savings.low.toLocaleString()}–$${savings.high.toLocaleString()}</div><div class="mt-metric-label">Estimated avoidable costs</div></div>
+      <div class="mt-card" style="padding:18px; margin:0; text-align:center;"><div class="mt-box-big">$${savings.depositLow.toLocaleString()}–$${savings.depositHigh.toLocaleString()}</div><div class="mt-metric-label">Deposit risk protected</div></div>
+      <div class="mt-card" style="padding:18px; margin:0; text-align:center;"><div class="mt-box-big">$${savings.moverSavings.toLocaleString()}</div><div class="mt-metric-label">Mover overtime avoided</div></div>
+      <div class="mt-card" style="padding:18px; margin:0; text-align:center;"><div class="mt-box-big">$${(savings.boxSavings + savings.avoidedDuplicateBuys).toLocaleString()}</div><div class="mt-metric-label">Supply/duplicate buys avoided</div></div>
+    </div>
+    <div class="mt-card">
+      <div class="mt-card-header"><h3>Savings estimate</h3></div>
+      <div class="mt-card-body" style="padding:16px 20px;">
+        <div class="mt-util-fields">
+          <label>Security deposit amount<input type="number" min="0" data-savings-field="depositAmount" value="${esc(s.depositAmount || '')}" placeholder="e.g. 3500" /></label>
+          <label>Mover hourly rate<input type="number" min="0" data-savings-field="moverHourlyRate" value="${esc(s.moverHourlyRate || '')}" placeholder="e.g. 225" /></label>
+          <label>Mover hours avoided<input type="number" min="0" step="0.5" data-savings-field="avoidedMoverHours" value="${esc(s.avoidedMoverHours || '')}" placeholder="e.g. 1.5" /></label>
+          <label>Borrowed/reused boxes<input type="number" min="0" data-savings-field="reusedBoxes" value="${esc(s.reusedBoxes || '')}" placeholder="e.g. 20" /></label>
+          <label>Duplicate buys avoided<input type="number" min="0" data-savings-field="avoidedDuplicateBuys" value="${esc(s.avoidedDuplicateBuys || '')}" placeholder="e.g. 80" /></label>
+        </div>
+      </div>
+    </div>
+    <div class="mt-card">
+      <div class="mt-card-header"><h3>Money-saving plays</h3></div>
+      <div class="mt-card-body">
+        ${plays.map((play, i) => {
+          const key = 'saving-' + i;
+          const isDone = !!state.checked[key];
+          return `
+            <div class="mt-item ${isDone ? 'done' : ''}">
+              <input type="checkbox" class="mt-check" data-check="${key}" ${isDone ? 'checked' : ''} aria-label="${esc(play.title)}" />
+              <div class="mt-item-text" data-check="${key}">
+                <strong>${esc(play.title)}</strong>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:3px; line-height:1.45;">${esc(play.detail)}</div>
+              </div>
+            </div>
+          `;
+        }).join('')}
       </div>
     </div>
   `;
@@ -628,11 +705,20 @@ function renderPhaseList(phases) {
 }
 
 function renderTasks() {
-  return renderPhaseList(AppEngine.TIMELINE_DATA_MATRIX);
+  return `
+    <div class="mt-alert-box">
+      <strong>COI = Certificate of Insurance.</strong> Many apartment buildings require your mover to send this proof of insurance before move day. Ask each building for its exact COI wording, send that to your booked mover, then forward the completed COI back to building management for approval.
+    </div>
+    <div class="mt-alert-box">
+      <strong>Security deposit plan:</strong> check your lease before patching or painting. Usually small nail holes can be spackled, but large damage, paint matching, and wall anchors may have building-specific rules. Keep before/after photos and send your forwarding address when you return keys.
+    </div>
+    ${renderPhaseList(AppEngine.TIMELINE_DATA_MATRIX)}
+  `;
 }
 
 function renderAptSearch() {
   const neighborhoods = state.neighborhoods || [];
+  const outreach = AppEngine.APT_OUTREACH_GUIDE || {};
   const guideCards = (AppEngine.APT_HUNT_GUIDES || []).map(guide => `
     <div class="mt-card">
       <div class="mt-card-header"><h3>${esc(guide.emoji)} ${esc(guide.title)}</h3></div>
@@ -653,7 +739,7 @@ function renderAptSearch() {
 
   return `
     <div class="mt-alert-box">
-      <strong>Apartment hunt cheat sheet:</strong> Listings usually get useful close to move-in, so speed matters more than endless browsing. Keep your renter docs ready before you tour.
+      <strong>Apartment hunt cheat sheet:</strong> The best listings tend to matter most closer to move-in, so being ready beats endless browsing. Keep your renter docs ready before you tour.
     </div>
     <div class="mt-card" style="margin-bottom:16px;">
       <div class="mt-card-header"><h3>Search setup</h3></div>
@@ -669,6 +755,25 @@ function renderAptSearch() {
       </div>
     </div>
     <div class="mt-guide-grid">${guideCards}</div>
+    <div class="mt-card mt-template-card">
+      <div class="mt-card-header"><h3>Agent outreach playbook</h3></div>
+      <div class="mt-card-body" style="padding:16px 20px;">
+        <div class="mt-two-col-list">
+          <div>
+            <strong>Best timing</strong>
+            <ul>${(outreach.bestTimes || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+          </div>
+          <div>
+            <strong>If they do not respond</strong>
+            <ul>${(outreach.followUp || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+          </div>
+        </div>
+        <div class="mt-template-grid">
+          <label>Email template<textarea class="mt-script-box">${esc(outreach.emailTemplate || '')}</textarea></label>
+          <label>Phone script<textarea class="mt-script-box">${esc(outreach.phoneScript || '')}</textarea></label>
+        </div>
+      </div>
+    </div>
     <div class="mt-card" style="margin: 0 0 16px 0; border-color: rgba(0,122,255,0.16); background: rgba(0,122,255,0.035);">
       <div class="mt-card-body" style="padding:14px 18px; font-size:13px; line-height:1.5;">
         <strong>NYC note:</strong> the FARE Act changed broker-fee rules in 2025. If a landlord's broker tries to charge you, verify who they represent before paying anything. Keep this note editable/removable for non-NYC users.
@@ -751,6 +856,7 @@ function renderApartments() {
   const list = state.apartments || [];
   const filter = state.aptFilter || 'all';
   const visibleList = filter === 'favorites' ? list.filter(a => a.favorite) : list;
+  const maxTargetRent = parseFloat(state.targetBudgetMax) || 0;
 
   const cards = visibleList.length ? visibleList.slice().reverse().map((a) => {
     const i = list.indexOf(a);
@@ -840,6 +946,12 @@ function renderApartments() {
         <span style="color: var(--text-muted); font-weight:600;">–</span>
         ${renderRentDropdownHtml('mt-apt-max-rent', 'Max Target Rent', state.targetBudgetMax || '')}
       </div>
+      ${maxTargetRent > 0 ? `
+        <p style="font-size: 12.5px; color: var(--text-muted); margin: 0; line-height: 1.45;">
+          Sanity check: for a $${maxTargetRent.toLocaleString()}/mo max, many landlords look for income around
+          <strong>$${(maxTargetRent * 40).toLocaleString()}/year</strong> under the common 40x rent rule.
+        </p>
+      ` : ''}
     </div>
     <div class="mt-apt-form" style="display:flex; flex-direction:column; gap:10px; margin-top: 20px;">
       <input type="text" id="mt-apt-name" placeholder="Address / Building Name" style="width:100%; box-sizing:border-box;" />
@@ -1386,6 +1498,7 @@ function render() {
   let body = '';
   if (state.activeTab === 'dashboard') body = renderDashboard();
   else if (state.activeTab === 'tasks') body = renderTasks();
+  else if (state.activeTab === 'savings') body = renderSavings();
   else if (state.activeTab === 'aptsearch') body = renderAptSearch();
   else if (state.activeTab === 'apartments') body = renderApartments();
   else if (state.activeTab === 'supplies') body = renderSupplies();
@@ -1578,6 +1691,15 @@ function attachHandlers() {
       AppEngine.saveState(state);
       render();
     });
+  });
+
+  root.querySelectorAll('[data-savings-field]').forEach(input => {
+    input.addEventListener('input', () => {
+      if (!state.savings) state.savings = { depositAmount: '', moverHourlyRate: '', avoidedMoverHours: '1', reusedBoxes: '', avoidedDuplicateBuys: '' };
+      state.savings[input.getAttribute('data-savings-field')] = input.value;
+      AppEngine.saveState(state);
+    });
+    input.addEventListener('blur', () => render());
   });
 
   const cityInput = root.querySelector('#mt-city-input');
