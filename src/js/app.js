@@ -11,14 +11,13 @@ if (!state.activeTab) {
 // 'moveout' = moving out of the current place.
 const appSections = [
   { id: 'dashboard', label: 'Dashboard', icon: '🏠', category: 'general' },
-  { id: 'spend', label: 'Spending Ledger', icon: '💰', category: 'general' },
   { id: 'aptsearch', label: 'Apartment Search Timeline', icon: '🔍', category: 'apartment' },
   { id: 'apartments', label: 'Apartment Tracker', icon: '🏢', category: 'apartment' },
   { id: 'tasks', label: 'Move-Out Timeline', icon: '📋', category: 'moveout' },
   { id: 'supplies', label: 'Boxes & Supplies', icon: '📦', category: 'moveout' },
   { id: 'donations', label: 'Donations Manager', icon: '🤝', category: 'moveout' },
   { id: 'movers', label: 'Moving Companies', icon: '🚛', category: 'moveout' },
-  { id: 'rooms', label: 'Room Packing Matrix', icon: '🧳', category: 'moveout' },
+  { id: 'rooms', label: 'Room Packing Checklist', icon: '🧳', category: 'moveout' },
   { id: 'addressutil', label: 'Address & Utilities', icon: '⚡', category: 'moveout' },
   { id: 'dayof', label: 'Move Day Survival', icon: '🎯', category: 'moveout' }
 ];
@@ -406,29 +405,95 @@ function getListingSourceInfo(url) {
     const parsedUrl = new URL(url);
     return {
       hostname: parsedUrl.hostname.replace('www.', ''),
-      faviconUrl: `<img src="https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32" alt="favicon" />`
+      faviconUrl: `<img src="https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32" alt="favicon" style="width:28px; height:28px; object-fit:contain;" />`
     };
   } catch (e) {
     return { hostname: 'External Reference Link', faviconUrl: '🔗' };
   }
 }
 
+// Known real-estate sites that block third-party unfurl bots outright — no point
+// spending a request against these, just go straight to the manual-photo prompt.
+const BLOCKED_PREVIEW_DOMAINS = ['streeteasy.com', 'zillow.com', 'apartments.com'];
+function isKnownBlockedDomain(url) {
+  try {
+    const hostname = new URL(url).hostname.replace('www.', '');
+    return BLOCKED_PREVIEW_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
+  } catch (e) {
+    return false;
+  }
+}
+
+// Tries to fetch a real preview image for a listing URL via microlink.io's free
+// unfurl API (same idea as an iMessage link preview). Some sites (StreetEasy,
+// Zillow, Apartments.com) block this outright — checked before we even try.
+async function fetchListingPreview(url) {
+  if (isKnownBlockedDomain(url)) return null;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const imageUrl = json?.data?.image?.url || json?.data?.logo?.url;
+    return imageUrl ? { image: imageUrl } : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Downscales an uploaded photo to a reasonable size before storing it as base64 in
+// localStorage, so a handful of manual photos don't blow the storage quota.
+function compressImageFile(file, maxWidth) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function renderApartments() {
   const list = state.apartments || [];
   const max = parseFloat(state.targetBudgetMax) || 0;
-  
-  const cards = list.length ? list.slice().reverse().map((a, ri) => {
-    const i = list.length - 1 - ri;
+  const filter = state.aptFilter || 'all';
+  const visibleList = filter === 'favorites' ? list.filter(a => a.favorite) : list;
+
+  const cards = visibleList.length ? visibleList.slice().reverse().map((a) => {
+    const i = list.indexOf(a);
     const status = a.status || 'Visited'; 
     let statusClass = 'mt-badge-optimal';
     if (status === 'Applied') statusClass = 'mt-badge-stretching';
     else if (status === 'Rejected') statusClass = 'mt-badge-fail';
     else if (status === 'Lease Signed') statusClass = 'mt-badge-success';
 
-    const { hostname, faviconUrl } = getListingSourceInfo(a.url);
+    const links = a.links && a.links.length ? a.links : (a.url ? [a.url] : []);
+    const primaryUrl = links[0];
+    const { hostname, faviconUrl } = getListingSourceInfo(primaryUrl);
+    const imageFrame = a.image
+      ? `<img src="${esc(a.image)}" alt="${esc(a.name)}" />`
+      : faviconUrl;
 
     const minRentText = a.minRent ? `$${parseFloat(a.minRent).toLocaleString()}` : "Any";
     const maxRentText = a.maxRent ? `$${parseFloat(a.maxRent).toLocaleString()}` : "Any";
+
+    const extraChips = links.slice(1).map(link => {
+      const info = getListingSourceInfo(link);
+      return `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" class="mt-apt-link-chip">${esc(info.hostname)}</a>`;
+    }).join(' ');
 
     return `
       <div class="mt-apt-card">
@@ -445,27 +510,47 @@ function renderApartments() {
             </div>
           </div>
           <div style="text-align:right;">
+            <button data-apt-favorite="${i}" class="mt-apt-favorite-btn" aria-label="Toggle favorite">${a.favorite ? '★' : '☆'}</button>
             <div class="mt-apt-price">${a.price ? '$' + parseFloat(a.price).toLocaleString() + '/mo' : '—'}</div>
             <span class="mt-apt-status ${statusClass}">${status}</span>
           </div>
         </div>
 
-        ${a.url ? `
-          <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; display:block;">
-            <div class="mt-apt-imessage-bubble">
-              <div class="mt-apt-favicon-frame">${faviconUrl}</div>
-              <div class="mt-apt-preview-text">
-                <span class="mt-apt-preview-headline">${esc(a.name || 'View Apartment Listing')}</span>
-                <span class="mt-apt-preview-sub">${esc(hostname)}</span>
+        ${primaryUrl ? `
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <a href="${esc(primaryUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; display:block; flex:1; min-width:0;">
+              <div class="mt-apt-imessage-bubble">
+                <div class="mt-apt-image-frame">${imageFrame}</div>
+                <div class="mt-apt-preview-text">
+                  <span class="mt-apt-preview-headline">${esc(a.name || 'View Apartment Listing')}</span>
+                  <span class="mt-apt-preview-sub">${esc(hostname)}</span>
+                </div>
               </div>
-            </div>
-          </a>
+            </a>
+            ${!a.image ? `
+              <label class="mt-apt-photo-cta">
+                📷 Add photo
+                <input type="file" accept="image/*" data-apt-photo="${i}" style="display:none;" />
+              </label>
+            ` : ''}
+          </div>
         ` : ''}
 
-        <button class="mt-apt-card-remove" data-apt-remove="${i}" style="margin-top: 14px; font-size: 11px; background: none; border: none; color: var(--accent-danger); cursor: pointer;">Delete Listing</button>
+        ${extraChips ? `<div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">${extraChips}</div>` : ''}
+
+        <div style="margin-top: 12px; display:flex; gap:14px; flex-wrap:wrap; align-items:center;">
+          <button data-apt-addlink="${i}" style="font-size: 11px; background: none; border: none; color: var(--accent-primary); cursor: pointer; padding:0;">+ Add another source</button>
+          ${a.image ? `
+            <label style="font-size: 11px; color: var(--accent-primary); cursor: pointer;">
+              📷 Replace photo
+              <input type="file" accept="image/*" data-apt-photo="${i}" style="display:none;" />
+            </label>
+          ` : ''}
+          <button data-apt-remove="${i}" style="font-size: 11px; background: none; border: none; color: var(--accent-danger); cursor: pointer; padding:0;">Delete Listing</button>
+        </div>
       </div>
     `;
-  }).join('') : '<div class="mt-empty">No apartments logged yet.</div>';
+  }).join('') : `<div class="mt-empty">${filter === 'favorites' ? 'No favorites yet — tap ☆ on a listing to save it here.' : 'No apartments logged yet.'}</div>`;
 
   return `
     <div class="mt-income-wrapper">
@@ -496,7 +581,11 @@ function renderApartments() {
       <input type="number" id="mt-apt-price" placeholder="Rent Amount/mo" style="width:100%; box-sizing:border-box;" />
       <button class="mt-wizard-btn" id="mt-apt-submit" style="width: 100%;">Add Apartment</button>
     </div>
-    <div style="margin-top: 20px;">
+    <div style="margin-top: 20px; display:flex; gap:8px;">
+      <button data-apt-filter="all" class="mt-apt-filter-tab ${filter === 'all' ? 'active' : ''}">All (${list.length})</button>
+      <button data-apt-filter="favorites" class="mt-apt-filter-tab ${filter === 'favorites' ? 'active' : ''}">★ Favorites (${list.filter(a => a.favorite).length})</button>
+    </div>
+    <div style="margin-top: 16px;">
       ${cards}
     </div>
   `;
@@ -513,16 +602,26 @@ function renderSupplies() {
       <div class="mt-supply-badge"><span class="count">${boxCalculations.tape} Rolls</span><span class="label">Packing Tape</span></div>
       <div class="mt-supply-badge"><span class="count">${boxCalculations.paper} Packs</span><span class="label">Wrapping Paper</span></div>
     </div>
+    <p style="font-size:12px; color:var(--text-muted); margin: 4px 0 20px;">
+      For the boxes/tape/paper above: <a href="https://www.amazon.com/s?k=moving+boxes+kit" target="_blank" rel="noopener noreferrer">Amazon moving box kits</a>,
+      U-Haul's box centers (they buy back unused boxes), or a FedEx Office/The UPS Store if you just need a handful of sturdy ones.
+    </p>
     <div class="mt-card">
       <div class="mt-card-header"><h3>Packing Logistics Checklist</h3></div>
       <div class="mt-card-body">
-        ${AppEngine.SUPPLIES.map((text, i) => {
+        ${AppEngine.SUPPLIES.map((supply, i) => {
           const key = 'supply-' + i;
           const isDone = !!state.checked[key];
+          const amazonUrl = `https://www.amazon.com/s?k=${encodeURIComponent(supply.name)}`;
           return `
             <div class="mt-item ${isDone ? 'done' : ''}">
-              <input type="checkbox" class="mt-check" data-check="${key}" ${isDone ? 'checked' : ''} aria-label="${esc(text)}" />
-              <div class="mt-item-text" data-check="${key}">${esc(text)}</div>
+              <input type="checkbox" class="mt-check" data-check="${key}" ${isDone ? 'checked' : ''} aria-label="${esc(supply.name)}" />
+              <div class="mt-item-text" data-check="${key}">
+                ${esc(supply.name)}
+                <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">
+                  Try: ${esc(supply.store)} · <a href="${amazonUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">Search on Amazon</a>
+                </div>
+              </div>
             </div>
           `;
         }).join('')}
@@ -550,34 +649,6 @@ function renderDonations() {
     `;
   }).join('');
   return `<div class="mt-cat-grid">${cats}</div>`;
-}
-
-function renderSpend() {
-  const total = state.spend.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
-  const rows = state.spend.length ? state.spend.slice().reverse().map((s, ri) => {
-    const i = state.spend.length - 1 - ri;
-    return `
-      <div class="mt-spend-row" style="display:flex; justify-content:space-between; padding: 12px 0; border-bottom:1px solid var(--border-color);">
-        <div><span style="font-weight:600; color:var(--accent-primary); margin-right:10px;">${esc(s.category)}</span> ${esc(s.note || '')}</div>
-        <div><span style="font-family:monospace; font-weight:600;">$${parseFloat(s.amount).toFixed(2)}</span><button data-spend-remove="${i}" style="background:none; border:none; color:var(--accent-danger); margin-left:10px; cursor:pointer;">×</button></div>
-      </div>
-    `;
-  }).join('') : '<div class="mt-empty">No logged transactions.</div>';
-
-  return `
-    <div class="mt-apt-summary">
-      <div class="mt-apt-stat" style="text-align:center; width:100%;"><span class="n">$${total.toFixed(2)}</span><span class="l">Total Outflow</span></div>
-    </div>
-    <div class="mt-spend-form" style="margin-top: 15px;">
-      <select id="mt-spend-cat">
-        ${AppEngine.SPEND_CATEGORIES.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}
-      </select>
-      <input type="text" id="mt-spend-note" placeholder="Item notation description" />
-      <input type="number" id="mt-spend-amt" placeholder="$0.00" />
-      <button id="mt-spend-submit" class="mt-wizard-btn" style="width:100%; margin-top:5px;">Log Transaction</button>
-    </div>
-    <div class="mt-card" style="margin-top:20px;"><div class="mt-card-body">${rows}</div></div>
-  `;
 }
 
 function renderMovers() {
@@ -626,25 +697,56 @@ function renderMovers() {
   `;
 }
 
+const ROOM_ICONS = { 'Kitchen': '🍳', 'Bedroom': '🛏️', 'Bathroom': '🚿', 'Closet': '👕', 'Living Room': '🛋️', 'Entryway/Storage': '📦' };
+const ACTION_TAGS = {
+  'bring': { label: 'Bring', color: '#2f6fed' },
+  'buy-new': { label: 'Buy new at destination', color: '#c9832f' },
+  'donate': { label: 'Consider donating', color: '#3f9e5e' },
+  'optional': { label: 'Optional', color: '#8a8a94' }
+};
+
 function renderRooms() {
-  return `
-    <div class="mt-mover-grid">
-      ${AppEngine.ROOMS.map(room => {
-        const currentStatus = state.rooms[room] || 'Not started';
-        return `
-          <div class="mt-cat">
-            <h4 style="margin:0 0 10px 0;">${esc(room)}</h4>
-            <div style="display:flex; gap:6px;">
-              <button data-room="${esc(room)}" data-room-status="Not started" class="btn-status-red ${currentStatus === 'Not started' ? 'active' : ''}" style="flex:1; padding:8px 4px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); cursor:pointer;">Not Started</button>
-              <button data-room="${esc(room)}" data-room-status="In progress" class="btn-status-yellow ${currentStatus === 'In progress' ? 'active' : ''}" style="flex:1; padding:8px 4px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); cursor:pointer;">In Progress</button>
-              <button data-room="${esc(room)}" data-room-status="Packed" class="btn-status-green ${currentStatus === 'Packed' ? 'active' : ''}" style="flex:1; padding:8px 4px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); cursor:pointer;">Packed</button>
-            </div>
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
+  const cards = AppEngine.ROOMS.map(room => {
+    const guide = AppEngine.ROOM_PACKING_GUIDE[room] || [];
+    const checklist = state.roomChecklist[room] || {};
+    const checkedCount = guide.filter(g => checklist[g.item]).length;
+    const total = guide.length;
+    const status = state.rooms[room] || 'Not started';
+    let statusColor = 'var(--text-muted)';
+    if (status === 'In progress') statusColor = '#c9832f';
+    else if (status === 'Packed') statusColor = '#3f9e5e';
+
+    return `
+      <details class="mt-cat mt-room-card" ${status !== 'Packed' ? 'open' : ''}>
+        <summary style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; list-style:none;">
+          <h4 style="margin:0; display:flex; align-items:center; gap:8px;"><span>${ROOM_ICONS[room] || '📦'}</span>${esc(room)}</h4>
+          <span style="font-size:11.5px; font-weight:700; color:${statusColor};">${checkedCount}/${total} packed</span>
+        </summary>
+        <div style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
+          ${guide.map(g => {
+            const isChecked = !!checklist[g.item];
+            const tag = ACTION_TAGS[g.action];
+            return `
+              <label class="mt-room-item ${isChecked ? 'done' : ''}" style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
+                <input type="checkbox" class="mt-room-item-checkbox" data-room="${esc(room)}" data-item="${esc(g.item)}" ${isChecked ? 'checked' : ''} style="margin-top:3px; flex-shrink:0;" />
+                <div>
+                  <div style="font-size:13.5px; font-weight:600; ${isChecked ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">
+                    ${esc(g.item)}
+                    ${tag ? `<span style="font-size:10px; font-weight:700; color:white; background:${tag.color}; padding:2px 7px; border-radius:10px; margin-left:6px; white-space:nowrap;">${tag.label}</span>` : ''}
+                  </div>
+                  <div style="font-size:12px; color:var(--text-muted); margin-top:3px; line-height:1.4;">${esc(g.tip)}</div>
+                </div>
+              </label>
+            `;
+          }).join('')}
+        </div>
+      </details>
+    `;
+  }).join('');
+
+  return `<div class="mt-mover-grid" style="grid-template-columns: 1fr;">${cards}</div>`;
 }
+
 
 function renderAddressUtil() {
   const rows = AppEngine.UTILITIES.map(u => {
@@ -745,7 +847,6 @@ function render() {
   else if (state.activeTab === 'apartments') body = renderApartments();
   else if (state.activeTab === 'supplies') body = renderSupplies();
   else if (state.activeTab === 'donations') body = renderDonations();
-  else if (state.activeTab === 'spend') body = renderSpend();
   else if (state.activeTab === 'movers') body = renderMovers();
   else if (state.activeTab === 'rooms') body = renderRooms();
   else if (state.activeTab === 'addressutil') body = renderAddressUtil();
@@ -863,13 +964,20 @@ function attachHandlers() {
     });
   });
 
-  root.querySelectorAll('[data-room-status]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const room = btn.getAttribute('data-room');
-      const status = btn.getAttribute('data-room-status');
+  root.querySelectorAll('.mt-room-item-checkbox').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const room = cb.getAttribute('data-room');
+      const item = cb.getAttribute('data-item');
+      if (!state.roomChecklist[room]) state.roomChecklist[room] = {};
+      state.roomChecklist[room][item] = cb.checked;
+
+      const guide = AppEngine.ROOM_PACKING_GUIDE[room] || [];
+      const checkedCount = guide.filter(g => state.roomChecklist[room][g.item]).length;
+      const newStatus = checkedCount === 0 ? 'Not started' : (checkedCount === guide.length ? 'Packed' : 'In progress');
+
       const wasAllDone = isAllDone();
-      const justPacked = status === 'Packed' && state.rooms[room] !== 'Packed';
-      state.rooms[room] = status;
+      const justPacked = newStatus === 'Packed' && state.rooms[room] !== 'Packed';
+      state.rooms[room] = newStatus;
       AppEngine.saveState(state);
       if (justPacked) {
         spawnConfetti(false);
@@ -904,10 +1012,26 @@ function attachHandlers() {
       const maxRent = root.querySelector('#mt-apt-max-rent').value;
 
       if (!name || !price) return alert('Building Address and Monthly Rent are required.');
-      
-      state.apartments.push({ name, price, url, minRent, maxRent, status: 'Visited' });
+
+      state.apartments.push({
+        name, price, minRent, maxRent, status: 'Visited',
+        links: url ? [url] : [], favorite: false, image: null, imageStatus: 'none'
+      });
+      const newIdx = state.apartments.length - 1;
       AppEngine.saveState(state);
       render();
+
+      if (url) {
+        fetchListingPreview(url).then(preview => {
+          const apt = state.apartments[newIdx];
+          if (preview && apt && apt.imageStatus !== 'manual') {
+            apt.image = preview.image;
+            apt.imageStatus = 'auto';
+            AppEngine.saveState(state);
+            render();
+          }
+        });
+      }
     });
   }
 
@@ -915,6 +1039,64 @@ function attachHandlers() {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.getAttribute('data-apt-status'), 10);
       state.apartments[idx].status = btn.getAttribute('data-status-val');
+      AppEngine.saveState(state);
+      render();
+    });
+  });
+
+  root.querySelectorAll('[data-apt-favorite]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.getAttribute('data-apt-favorite'), 10);
+      state.apartments[idx].favorite = !state.apartments[idx].favorite;
+      AppEngine.saveState(state);
+      render();
+    });
+  });
+
+  root.querySelectorAll('[data-apt-addlink]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.getAttribute('data-apt-addlink'), 10);
+      const url = prompt('Paste another listing link for this apartment (StreetEasy, Zillow, etc.):');
+      if (!url || !url.trim()) return;
+      const apt = state.apartments[idx];
+      if (!apt.links) apt.links = [];
+      apt.links.push(url.trim());
+      AppEngine.saveState(state);
+      render();
+
+      if (!apt.image) {
+        fetchListingPreview(url.trim()).then(preview => {
+          if (preview && apt.imageStatus !== 'manual') {
+            apt.image = preview.image;
+            apt.imageStatus = 'auto';
+            AppEngine.saveState(state);
+            render();
+          }
+        });
+      }
+    });
+  });
+
+  root.querySelectorAll('[data-apt-photo]').forEach(input => {
+    input.addEventListener('change', async () => {
+      const idx = parseInt(input.getAttribute('data-apt-photo'), 10);
+      const file = input.files[0];
+      if (!file) return;
+      try {
+        const dataUrl = await compressImageFile(file, 480);
+        state.apartments[idx].image = dataUrl;
+        state.apartments[idx].imageStatus = 'manual';
+        AppEngine.saveState(state);
+        render();
+      } catch (e) {
+        alert('Could not load that photo — try a different file.');
+      }
+    });
+  });
+
+  root.querySelectorAll('[data-apt-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.aptFilter = btn.getAttribute('data-apt-filter');
       AppEngine.saveState(state);
       render();
     });
@@ -952,27 +1134,6 @@ function attachHandlers() {
     });
   });
 
-  const spendSubmit = root.querySelector('#mt-spend-submit');
-  if (spendSubmit) {
-    spendSubmit.addEventListener('click', () => {
-      const cat = root.querySelector('#mt-spend-cat').value;
-      const note = root.querySelector('#mt-spend-note').value.trim();
-      const amt = root.querySelector('#mt-spend-amt').value;
-      if (!amt) return alert('Please enter an amount.');
-      state.spend.push({ category: cat, note, amount: amt });
-      AppEngine.saveState(state);
-      render();
-    });
-  }
-
-  root.querySelectorAll('[data-spend-remove]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.getAttribute('data-spend-remove'), 10);
-      state.spend.splice(idx, 1);
-      AppEngine.saveState(state);
-      render();
-    });
-  });
 }
 
 // --- STARTUP ---
