@@ -202,11 +202,11 @@ body {
 .mt-wizard-card { background: #fff; border-radius: 16px; padding: 40px; max-width: 420px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.05); text-align: center; border: 1px solid var(--border-color); }
 .mt-wizard-field { text-align: left; margin-bottom: 20px; }
 .mt-wizard-field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-muted); text-transform: uppercase; }
-.mt-wizard-field input, .mt-wizard-field select { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; }
+.mt-wizard-field input, .mt-wizard-field select { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; }
 
 /* ---- Welcome Animation Overlay ---- */
 #mt-welcome-overlay {
-  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh;
   background:
     linear-gradient(180deg, #ffffff 0%, #f6f7fb 68%),
     var(--bg-app); z-index: 99999;
@@ -214,9 +214,16 @@ body {
   flex-direction: column;
   border: 10px solid rgba(235,110,175,0.34);
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#mt-welcome-overlay.mt-onboarding-welcome {
+  justify-content: flex-start;
+  padding: 28px 0 34px;
 }
 .mt-welcome-scene { position: relative; width: 100vw; height: 270px; margin-top: -20px; overflow: hidden; flex-shrink: 0; }
+#mt-welcome-overlay.mt-onboarding-welcome .mt-welcome-scene { height: 260px; margin-top: 0; }
 .mt-road {
   position: absolute; left: 0; right: 0; bottom: 34px; height: 58px;
   background: linear-gradient(180deg, #464850, #30323a);
@@ -228,15 +235,20 @@ body {
   content: ''; position: absolute; left: 0; right: 0; top: 24px; height: 4px;
   background: repeating-linear-gradient(90deg, rgba(255,255,255,0.75) 0 44px, transparent 44px 78px);
 }
-.mt-house { position: absolute; right: clamp(36px, 10vw, 170px); bottom: 64px; width: 132px; height: 132px; z-index: 1; filter: drop-shadow(0 14px 18px rgba(31,55,76,0.14)); }
+.mt-house { position: absolute; right: clamp(36px, 10vw, 170px); bottom: 92px; width: 132px; height: 132px; z-index: 3; filter: drop-shadow(0 14px 18px rgba(31,55,76,0.14)); }
 .mt-house-roof {
-  position: absolute; left: 10px; top: 0; width: 112px; height: 112px;
-  background: #eb6e6e; transform: rotate(45deg); border-radius: 8px 8px 4px 8px;
+  position: absolute; left: 4px; top: 4px; width: 0; height: 0;
+  border-left: 62px solid transparent;
+  border-right: 62px solid transparent;
+  border-bottom: 58px solid #eb6e6e;
+  filter: drop-shadow(0 5px 0 rgba(150,70,58,0.16));
+  z-index: 2;
 }
 .mt-house-body {
   position: absolute; left: 18px; right: 18px; bottom: 0; height: 82px;
   background: linear-gradient(180deg, #fff8eb, #f2dfbf);
   border: 3px solid rgba(112,80,45,0.16); border-radius: 8px 8px 4px 4px;
+  z-index: 1;
 }
 .mt-house-window { position: absolute; top: 18px; width: 24px; height: 22px; background: #a8d8ff; border: 3px solid #ffffff; border-radius: 5px; box-shadow: inset 0 -8px 0 rgba(0,122,255,0.12); }
 .window-left { left: 12px; }
@@ -249,16 +261,31 @@ body {
   filter: drop-shadow(0 18px 18px rgba(31,55,76,0.20));
   z-index: 4;
 }
-.mt-box { font-size: 48px; position: absolute; left: calc(50% + 12px); bottom: 106px; opacity: 0; z-index: 5; animation: unload-box 1s 1.5s forwards; filter: drop-shadow(0 10px 9px rgba(74,47,24,0.16)); }
+.mt-box { font-size: 48px; position: absolute; left: calc(50% + 12px); bottom: 84px; opacity: 0; z-index: 5; animation: unload-box 1s 1.5s forwards; filter: drop-shadow(0 10px 9px rgba(74,47,24,0.16)); }
 .mt-ground-box { position: absolute; z-index: 5; opacity: 0; line-height: 1; filter: drop-shadow(0 11px 9px rgba(74,47,24,0.16)); animation: scene-pop 0.45s 1.9s ease forwards; }
-.box-left-large { left: clamp(18px, calc(50% - 395px), 360px); bottom: 88px; font-size: 76px; --box-rotate: -6deg; }
-.box-left-mid { left: clamp(94px, calc(50% - 292px), 455px); bottom: 88px; font-size: 60px; --box-rotate: 5deg; animation-delay: 2.08s; }
+.box-left-large { left: clamp(92px, calc(50% - 265px), 520px); bottom: 66px; font-size: 76px; --box-rotate: -6deg; }
+.box-left-mid { left: clamp(168px, calc(50% - 172px), 612px); bottom: 66px; font-size: 60px; --box-rotate: 5deg; animation-delay: 2.08s; }
 
 @keyframes drive-stop-unload { 0% { left: -360px; } 46% { left: calc(50% - 155px); } 100% { left: calc(50% - 155px); } }
 @keyframes unload-box { 0% { opacity: 0; transform: translate(0, -8px) scale(0.92); } 100% { opacity: 1; transform: translate(8px, 18px) scale(1); } }
 @keyframes scene-pop { from { opacity: 0; transform: translateY(10px) scale(0.96) rotate(var(--box-rotate, 0deg)); } to { opacity: 1; transform: translateY(0) scale(1) rotate(var(--box-rotate, 0deg)); } }
-.welcome-content { opacity: 0; animation: fade-in 1s 2s forwards; text-align: center; margin-top: 40px; }
+.welcome-content { opacity: 0; animation: fade-in 1s 2s forwards; text-align: center; margin-top: 40px; width: min(92vw, 520px); }
+#mt-welcome-overlay.mt-onboarding-welcome .welcome-content { margin-top: 4px; padding-bottom: 12px; }
+.welcome-content h1 { font-size: 48px; font-weight: 800; margin: 0 0 10px; line-height: 1.05; letter-spacing: 0; }
+.mt-welcome-subcopy { color: var(--text-muted); font-size: 17px; line-height: 1.45; margin: 0 auto 18px; max-width: 440px; }
+.mt-welcome-form { box-sizing: border-box; max-width: 440px; padding: 24px; margin: 0 auto; text-align: left; }
+.mt-welcome-form .mt-wizard-btn { width: 100%; padding: 13px 16px; font-size: 15px; }
 @keyframes fade-in { to { opacity: 1; } }
+
+@media (max-height: 760px) and (min-width: 769px) {
+  #mt-welcome-overlay.mt-onboarding-welcome { padding-top: 14px; }
+  #mt-welcome-overlay.mt-onboarding-welcome .mt-welcome-scene { height: 236px; margin-top: 0; transform: scale(0.92); transform-origin: center bottom; }
+  #mt-welcome-overlay.mt-onboarding-welcome .welcome-content { margin-top: 0; }
+  .welcome-content h1 { font-size: 38px; }
+  .mt-welcome-subcopy { font-size: 14px; margin-bottom: 10px; }
+  .mt-welcome-form { padding: 18px; }
+  .mt-welcome-form .mt-wizard-field { margin-bottom: 12px; }
+}
 
 /* ---- Utility & State Buttons ---- */
 .btn-status-red { border-color: var(--accent-danger) !important; color: var(--accent-danger) !important; }
@@ -441,9 +468,14 @@ body {
   .mt-focus-row { flex-direction: column; }
   .mt-hero-card { padding: 24px 16px; border-radius: 14px; }
   .mt-hero-card h1 { font-size: 27px; }
-  .mt-welcome-scene { transform: scale(0.82); transform-origin: center bottom; height: 230px; margin-top: -36px; }
-  .welcome-content { margin-top: 8px; padding: 0 18px; }
+  #mt-welcome-overlay { justify-content: flex-start; padding: env(safe-area-inset-top) 0 22px; border-width: 6px; }
+  #mt-welcome-overlay.mt-onboarding-welcome { padding-bottom: 28px; }
+  .mt-welcome-scene { transform: scale(0.82); transform-origin: center bottom; height: 218px; margin-top: -26px; }
+  .welcome-content { margin-top: 2px; padding: 0 14px; width: min(100%, 420px); box-sizing: border-box; }
   .welcome-content h1 { font-size: 36px !important; }
+  .mt-welcome-subcopy { font-size: 14px; margin-bottom: 12px; }
+  .mt-welcome-form { padding: 18px; border-radius: 12px; }
+  .mt-welcome-form .mt-wizard-field { margin-bottom: 12px; }
   .mt-mini-action { width: 100%; }
   #mt-update-toast { left: 12px; right: 12px; bottom: 12px; transform: none; justify-content: space-between; }
 }

@@ -23,14 +23,9 @@ const appSections = [
   { id: 'dayof', label: 'Move Day', icon: '🎯', category: 'moveout' }
 ];
 
-// --- CORE ANIMATION ---
-function playWelcomeAnimation() {
-  if (!state.userName || !state.targetMoveDate || sessionStorage.getItem('hasAnimated')) return;
-
-  const overlay = document.createElement('div');
-  overlay.id = 'mt-welcome-overlay';
-  
-  overlay.innerHTML = `
+// --- CORE ANIMATION / WELCOME ---
+function renderWelcomeSceneHtml(contentHtml) {
+  return `
     <div class="mt-welcome-scene">
       <div class="mt-road"></div>
       <div class="mt-house" aria-hidden="true">
@@ -47,12 +42,65 @@ function playWelcomeAnimation() {
       <div class="mt-box">📦</div>
     </div>
     <div class="welcome-content">
+      ${contentHtml}
+    </div>
+  `;
+}
+
+function getSetupFormHtml() {
+  return `
+    <h1>Moving Assistant</h1>
+    <p class="mt-welcome-subcopy">Tell me the basics and I’ll build the move plan around them.</p>
+    <div class="mt-wizard-card mt-welcome-form">
+      <div class="mt-wizard-field"><label>What should we call you?</label><input type="text" id="wiz-name" placeholder="e.g. Andy" value="${esc(state.userName || '')}" /></div>
+      <div class="mt-wizard-field"><label>When's moving day?</label><input type="date" id="wiz-date" value="${state.targetMoveDate || ''}" /></div>
+      <div class="mt-wizard-field"><label>City / market</label><input type="text" id="wiz-city" placeholder="e.g. New York" value="${esc(state.city || '')}" /></div>
+      <div class="mt-wizard-field">
+        <label>How big's the place?</label>
+        <select id="wiz-size">
+          <option value="studio" ${state.aptSize === 'studio' ? 'selected' : ''}>Studio Layout</option>
+          <option value="1br" ${state.aptSize === '1br' ? 'selected' : ''}>1-Bedroom Apartment</option>
+          <option value="2br" ${state.aptSize === '2br' ? 'selected' : ''}>2-Bedroom Apartment</option>
+          <option value="3br" ${state.aptSize === '3br' ? 'selected' : ''}>3-Bedroom Apartment</option>
+        </select>
+      </div>
+      <button class="mt-wizard-btn" id="wiz-submit">Build My Move Plan</button>
+    </div>
+  `;
+}
+
+function bindSetupForm(root) {
+  const submit = root.querySelector('#wiz-submit');
+  if (!submit) return;
+  submit.addEventListener('click', () => {
+    const name = root.querySelector('#wiz-name').value.trim();
+    const date = root.querySelector('#wiz-date').value;
+    const size = root.querySelector('#wiz-size').value;
+    const city = root.querySelector('#wiz-city').value.trim();
+    if (!name || !date) return alert('Just need your name and move date to get started!');
+    state.userName = name;
+    state.targetMoveDate = date;
+    state.aptSize = size;
+    state.city = city;
+    state.showWizardOverride = false;
+    AppEngine.saveState(state);
+    sessionStorage.removeItem('hasAnimated');
+    render();
+  });
+}
+
+function playWelcomeAnimation() {
+  if (!state.userName || !state.targetMoveDate || sessionStorage.getItem('hasAnimated')) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'mt-welcome-overlay';
+  
+  overlay.innerHTML = renderWelcomeSceneHtml(`
       <h1 style="font-size: 48px; font-weight: 800; margin-bottom: 10px;">Moving Assistant</h1>
       <p style="color: var(--text-muted); font-size: 20px;">Welcome back, ${esc(state.userName || 'friend')}.</p>
       <button id="mt-enter-app" class="mt-wizard-btn" style="margin-top: 20px; width: auto; padding: 15px 40px; font-size: 18px;">Resume Move</button>
       <button id="mt-start-new" style="display:block; margin: 15px auto; background:none; border:none; color:var(--text-muted); cursor:pointer;">Start New Move</button>
-    </div>
-  `;
+  `);
   
   overlay.querySelector('#mt-enter-app').addEventListener('click', () => {
     overlay.style.transition = 'opacity 0.5s';
@@ -1458,40 +1506,11 @@ function render() {
   const root = document.getElementById('move-tracker-root');
   if (!state.userName || !state.targetMoveDate || state.showWizardOverride) {
     root.innerHTML = `
-      <div class="mt-wizard-overlay">
-        <div class="mt-wizard-card">
-          <h2>📦 Welcome! Let's Get Your Move On</h2>
-          <p>Just the basics — we'll handle the rest.</p>
-          <div class="mt-wizard-field"><label>What should we call you?</label><input type="text" id="wiz-name" placeholder="e.g. Andy" value="${esc(state.userName || '')}" /></div>
-          <div class="mt-wizard-field"><label>When's moving day?</label><input type="date" id="wiz-date" value="${state.targetMoveDate || ''}" /></div>
-          <div class="mt-wizard-field"><label>City / market</label><input type="text" id="wiz-city" placeholder="e.g. New York" value="${esc(state.city || '')}" /></div>
-          <div class="mt-wizard-field">
-            <label>How big's the place?</label>
-            <select id="wiz-size">
-              <option value="studio" ${state.aptSize === 'studio' ? 'selected' : ''}>Studio Layout</option>
-              <option value="1br" ${state.aptSize === '1br' ? 'selected' : ''}>1-Bedroom Apartment</option>
-              <option value="2br" ${state.aptSize === '2br' ? 'selected' : ''}>2-Bedroom Apartment</option>
-              <option value="3br" ${state.aptSize === '3br' ? 'selected' : ''}>3-Bedroom Apartment</option>
-            </select>
-          </div>
-          <button class="mt-wizard-btn" id="wiz-submit">Let's Do This</button>
-        </div>
+      <div id="mt-welcome-overlay" class="mt-onboarding-welcome">
+        ${renderWelcomeSceneHtml(getSetupFormHtml())}
       </div>
     `;
-    document.getElementById('wiz-submit').addEventListener('click', () => {
-      const name = document.getElementById('wiz-name').value.trim();
-      const date = document.getElementById('wiz-date').value;
-      const size = document.getElementById('wiz-size').value;
-      const city = document.getElementById('wiz-city').value.trim();
-      if (!name || !date) return alert('Just need your name and move date to get started!');
-      state.userName = name;
-      state.targetMoveDate = date;
-      state.aptSize = size;
-      state.city = city;
-      state.showWizardOverride = false;
-      AppEngine.saveState(state);
-      render();
-    });
+    bindSetupForm(root);
     return;
   }
 
