@@ -22,10 +22,35 @@
   <script src="src/js/state.js"></script>
   <script src="src/js/app.js"></script>
   <script>
+    function showAppUpdateToast(registration) {
+      if (document.getElementById('mt-update-toast')) return;
+      const toast = document.createElement('div');
+      toast.id = 'mt-update-toast';
+      toast.innerHTML = '<span>Fresh moving magic is ready.</span><button type="button">Update</button>';
+      toast.querySelector('button').addEventListener('click', () => {
+        if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      });
+      document.body.appendChild(toast);
+    }
+
     if ('serviceWorker' in navigator) {
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      });
+
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then((reg) => {
-          // Check for a newer version every time the app is opened.
+          if (reg.waiting && navigator.serviceWorker.controller) showAppUpdateToast(reg);
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (!newWorker) return;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) showAppUpdateToast(reg);
+            });
+          });
           reg.update();
         }).catch((err) => console.error('SW registration failed:', err));
       });

@@ -1,5 +1,5 @@
 // Bump this version string on every deploy — it's what forces old caches to clear.
-const CACHE_VERSION = 'moving-assistant-v6';
+const CACHE_VERSION = 'moving-assistant-v10';
 
 const CORE_ASSETS = [
   './',
@@ -8,6 +8,8 @@ const CORE_ASSETS = [
   './src/css/style.css',
   './src/js/state.js',
   './src/js/app.js',
+  './src/assets/moving-truck.webp',
+  './src/assets/icons/apple-touch-icon.png',
   './src/assets/icons/icon-192.png',
   './src/assets/icons/icon-512.png'
 ];
@@ -16,7 +18,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) => cache.addAll(CORE_ASSETS))
   );
-  self.skipWaiting();
+  // Do not auto-activate updates; index.html shows an update button when a new worker is ready.
 });
 
 self.addEventListener('activate', (event) => {
@@ -56,4 +58,9 @@ self.addEventListener('fetch', (event) => {
       });
     })
   );
+});
+
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });

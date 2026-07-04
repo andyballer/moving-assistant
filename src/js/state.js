@@ -2,6 +2,7 @@ window.MovingApp = window.MovingApp || {};
 
 window.MovingApp.APT_STATUSES = ['Inquired', 'Emailed/Called', 'Visited', 'Applied', 'Rejected', 'Lease Signed'];
 window.MovingApp.STORAGE_KEY = 'move-tracker:state:v8';
+window.MovingApp.SCHEMA_VERSION = 9;
 
 window.MovingApp.DONATION_CATEGORIES = ['Books', 'Games', 'Clothes', 'Electronics', 'Other'];
 window.MovingApp.ROOMS = ['Kitchen', 'Bedroom', 'Bathroom', 'Closet', 'Living Room', 'Entryway/Storage'];
@@ -57,6 +58,41 @@ window.MovingApp.ROOM_PACKING_GUIDE = {
 };
 window.MovingApp.UTILITIES = ['Electric', 'Gas', 'Internet/Cable', 'Water (if applicable)'];
 
+window.MovingApp.UTILITY_GUIDE = {
+  'Electric': { lead: '1–2 weeks ahead', nudge: 'Set activation for move-in day or the day before. Nobody wants first-night flashlight vibes.' },
+  'Gas': { lead: '1–2 weeks ahead', nudge: 'If heat, hot water, or the stove depends on gas, confirm any appointment window early.' },
+  'Internet/Cable': { lead: '2–3 weeks ahead', nudge: 'Book this early. First night without Wi‑Fi is how you end up watching one downloaded episode forever.' },
+  'Water (if applicable)': { lead: 'Ask building/landlord', nudge: 'Often handled by the building or landlord, but worth confirming so it does not become a move-in surprise.' }
+};
+
+window.MovingApp.MOVE_DAY_STAGES = [
+  {
+    title: 'Before movers arrive',
+    emoji: '☕',
+    items: ['Charge phone and keep charger with you', 'Pack meds, wallet, keys, documents, and 2 days of clothes', 'Take photos of the old apartment condition', 'Clear a path from rooms to the door', 'Keep open-first boxes separate from the main pile']
+  },
+  {
+    title: 'While the truck is loading',
+    emoji: '🚛',
+    items: ['Do a drawer/cabinet/closet sweep before anything leaves', 'Point fragile and open-first boxes out to movers', 'Keep elevator/super/COI details handy', 'Photograph anything valuable or delicate before it is wrapped']
+  },
+  {
+    title: 'Final sweep before leaving',
+    emoji: '🔦',
+    items: ['Open every drawer, cabinet, closet, and medicine cabinet', 'Check outlets for chargers and extension cords', 'Take final condition photos for deposit protection', 'Return keys, fobs, and garage/elevator passes as required', 'Text/email building management that you are fully out']
+  },
+  {
+    title: 'At the new place',
+    emoji: '🏁',
+    items: ['Direct boxes by room before they become a cardboard mountain', 'Set up bed basics first — future you deserves a landing pad', 'Find toilet paper, towels, shower curtain, and soap', 'Plug in router/modem if available', 'Eat something real before unpacking turns feral']
+  },
+  {
+    title: 'First night sanity kit',
+    emoji: '🛌',
+    items: ['Make the bed before you are too tired to function', 'Put meds, chargers, wallet, keys, and documents somewhere obvious', 'Unpack towels, soap, toothbrush, and shower basics', 'Set up one lamp or nightlight', 'Leave tomorrow-you a water bottle and clean clothes']
+  }
+];
+
 window.MovingApp.MOVERS = [
   { name: 'Roadway Moving', phone: '(212) 812-5240', price: 'Flat-rate quote, mid-to-upper range', desc: 'Reliable full-service standard, dedicated coordinators, binding estimates.' },
   { name: 'FlatRate Moving', phone: '(212) 988-9292', price: '$900-$1,400 for a 1BR local move (flat-rate)', desc: 'Originator of guaranteed flat-rate pricing, no surprise hourly overage.' },
@@ -72,9 +108,16 @@ window.MovingApp.MOVE_TIPS = [
   "Pack a separate bag with 2 days of clothes, toiletries, and chargers — treat it like a weekend trip, not part of the move",
   "Don't schedule anything the day after move day — give yourself a buffer",
   'Keep phone chargers, medications, and important documents on your person, not in a box',
-  'Label boxes by room, not contents — movers just need to know where to put them',
+  'Label the outside by room + box number; keep the detailed contents in the app so movers are not reading your sock inventory',
   'Take a deep breath — everyone hates moving, this feeling is normal and temporary'
 ];
+
+window.MovingApp.MOVER_TIPPING_GUIDE = {
+  simpleRule: '$5–$10 per mover per hour is a common practical range. $20–$40 per mover often works for a small local move; $50–$100+ per mover is common for long, stair-heavy, or unusually smooth jobs.',
+  cashNote: 'Cash in separate envelopes is easiest when you want each mover to get their share directly.',
+  raiseFor: ['Lots of stairs', 'Heat, rain, or snow', 'Heavy or fragile pieces', 'Long carry distance', 'Great attitude and careful handling'],
+  lowerFor: ['Late arrival without communication', 'Careless handling', 'Missing agreed services', 'Rudeness or pressure for a tip']
+};
 
 window.MovingApp.TIMELINE_DATA_MATRIX = [
   { id: '8wk', weeksOut: 8, label: '8 Weeks: Strategy', items: ['Calculate max rent: (Annual Income / 40) [10m]', 'Research 3 movers: Compare reviews/services [45m]', 'Get COI requirements from both building managements [15m]', 'Categorize: Sort 3 donation bags for pickup [1h]'] },
@@ -85,10 +128,33 @@ window.MovingApp.TIMELINE_DATA_MATRIX = [
 ];
 
 window.MovingApp.APT_PHASES = [
-  { id: 'apt-t60', weeksOut: 8, label: 'Active Pipeline Sourcing', items: ['Define budget ceiling & must-haves (Gramercy/Flatiron/Murray Hill)', 'Set up alerts on StreetEasy, Zillow, Renthop', 'Start touring — schedule 3-5 viewings per week'] },
-  { id: 'apt-t30', weeksOut: 4, label: 'Application Verification Sourcing', items: ['Submit applications for top choices', 'Gather docs: pay stubs, W-2, bank statements, ID', 'Pay application/credit check fees ($20 legal cap)'] },
-  { id: 'apt-t14', weeksOut: 2, label: 'Lease Processing Closures', items: ['Sign lease & pay security deposit + first month', 'Submit COI to new building', 'Reserve freight elevator for move day'] }
+  { id: 'apt-t60', weeksOut: 8, label: 'Start the hunt', items: ['Define budget ceiling, must-haves, and deal-breakers', 'Set up alerts on StreetEasy, Zillow, Renthop, or your local listing sites', 'Start touring — aim for 3–5 viewings per week once listings are fresh'] },
+  { id: 'apt-t30', weeksOut: 4, label: 'Apply fast', items: ['Submit applications for top choices', 'Build renter resume: pay stubs, employment letter, bank statements, ID', 'Watch fees carefully — NYC application/credit checks are generally capped at $20'] },
+  { id: 'apt-t14', weeksOut: 2, label: 'Lock it down', items: ['Sign lease & pay security deposit + first month', 'Submit COI to new building if required', 'Reserve freight elevator for move day'] }
 ];
+
+window.MovingApp.APT_HUNT_GUIDES = [
+  {
+    id: 'renter-resume',
+    title: 'Renter resume',
+    emoji: '📄',
+    items: ['Two recent pay stubs', 'Employment letter', 'Two bank statements', 'Photo ID scan', 'Tax docs if requested']
+  },
+  {
+    id: 'tour-detective',
+    title: 'Tour like a detective',
+    emoji: '🔎',
+    items: ['Run faucets and check pressure', 'Test cell signal in every room', 'Open windows', 'Check hallway, laundry, trash, and lobby areas', 'Reality-check the commute at rush hour']
+  },
+  {
+    id: 'scam-radar',
+    title: 'Scam radar',
+    emoji: '👻',
+    items: ['Be skeptical of suspiciously cheap listings', 'Never wire money before seeing a place', 'Watch pending listings that may come back', 'Verify who any broker represents']
+  }
+];
+
+window.MovingApp.DEFAULT_NEIGHBORHOODS = ['Gramercy', 'Flatiron', 'Murray Hill'];
 
 window.MovingApp.SUPPLIES = [
   { name: 'Tape Gun & Dispensers', store: 'Target, Staples, or U-Haul' },
@@ -97,7 +163,106 @@ window.MovingApp.SUPPLIES = [
   { name: 'Color-Coded Room Label Stickers', store: 'Amazon or Staples' },
   { name: 'Stretch Wrap Roll for Furniture', store: 'U-Haul, Home Depot, or Amazon' }
 ];
-window.MovingApp.ADDRESS_CHANGES = ['USPS mail forwarding Profile', 'Bank Accounts & Credit Cards', 'Employer Payroll HR', 'DMV Driver License Registry', 'Active Subscriptions Default Shipping Profiles'];
+window.MovingApp.ADDRESS_CHANGES = ['USPS mail forwarding', 'Bank accounts & credit cards', 'Employer payroll / HR', "Driver's license or state ID", 'Shopping, subscriptions, and delivery apps'];
+
+window.MovingApp.DEFAULT_BOX_PLAN = [
+  {
+    label: 'Box 1',
+    room: 'Closet',
+    contents: ['Off-season clothes', 'Rarely worn shoes', 'Extra scarves/hats', 'Closet shelf items you will not touch before moving'],
+    note: 'Best first box: low-risk, non-daily stuff you can pack 6-8 weeks out.',
+    fragile: false,
+    openFirst: false
+  },
+  {
+    label: 'Box 2',
+    room: 'Living Room',
+    contents: ['Books you are not currently reading', 'Photo albums', 'Board games', 'Small shelf items'],
+    note: 'Use a small box. Books get heavy absurdly fast.',
+    fragile: false,
+    openFirst: false
+  },
+  {
+    label: 'Box 3',
+    room: 'Living Room',
+    contents: ['Decor', 'Candles', 'Frames without glass', 'Low-priority display items'],
+    note: 'Clear visual clutter early without touching daily routines.',
+    fragile: true,
+    openFirst: false
+  },
+  {
+    label: 'Box 4',
+    room: 'Entryway/Storage',
+    contents: ['Seasonal storage', 'Spare bags', 'Archived papers to keep', 'Extra extension cords'],
+    note: 'Storage zones are perfect early wins because they rarely affect your week.',
+    fragile: false,
+    openFirst: false
+  },
+  {
+    label: 'Box 5',
+    room: 'Bedroom',
+    contents: ['Extra bedding', 'Guest linens', 'Decor pillows', 'Bedroom decor'],
+    note: 'Keep one normal bedding set out. Everything extra can go.',
+    fragile: false,
+    openFirst: false
+  },
+  {
+    label: 'Box 6',
+    room: 'Kitchen',
+    contents: ['Serving platters', 'Specialty glasses', 'Baking tools you rarely use', 'Holiday or party supplies'],
+    note: 'First kitchen box should be non-essential kitchen only, not daily plates or cookware.',
+    fragile: true,
+    openFirst: false
+  },
+  {
+    label: 'Box 7',
+    room: 'Bathroom',
+    contents: ['Backstock toiletries', 'Extra towels', 'Travel-size duplicates', 'Unopened medicine cabinet extras'],
+    note: 'Leave daily medicine and shower basics out until move week.',
+    fragile: false,
+    openFirst: false
+  },
+  {
+    label: 'Box 8',
+    room: 'Living Room',
+    contents: ['Cables you are not using', 'Spare remotes', 'Game console accessories', 'Small electronics extras'],
+    note: 'Bag and label cords before they become mystery noodles.',
+    fragile: true,
+    openFirst: false
+  },
+  {
+    label: 'Box 9',
+    room: 'Kitchen',
+    contents: ['Pantry overflow', 'Duplicate mugs', 'Extra utensils', 'Cookbooks'],
+    note: 'Pack this around 3-4 weeks out, after you know what you still use.',
+    fragile: true,
+    openFirst: false
+  },
+  {
+    label: 'Box 10',
+    room: 'Bedroom',
+    contents: ['Desk papers', 'Office supplies', 'Non-daily chargers', 'Small personal items'],
+    note: 'Keep IDs, lease papers, laptop charger, and daily meds with you instead.',
+    fragile: false,
+    openFirst: false
+  },
+  {
+    label: 'Open First 1',
+    room: 'Bathroom',
+    contents: ['Toilet paper', 'Hand soap', 'Shower curtain and rings', 'Towel', 'Toothbrush/toothpaste', 'Basic toiletries'],
+    note: 'Pack during move week and keep it reachable.',
+    fragile: false,
+    openFirst: true
+  },
+  {
+    label: 'Open First 2',
+    room: 'Bedroom',
+    contents: ['Sheets', 'Pillowcase', 'Phone charger', 'Two days of clothes', 'Meds', 'Important documents'],
+    note: 'This rides with you, not buried in the truck.',
+    fragile: false,
+    openFirst: true
+  }
+];
 
 window.MovingApp.getBudgetLimits = function(annualIncome) {
   const income = parseFloat(annualIncome) || 0;
@@ -119,9 +284,12 @@ window.MovingApp.calculateSuppliesConfig = function(size) {
 
 window.MovingApp.defaultState = function() {
   return {
+    schemaVersion: window.MovingApp.SCHEMA_VERSION,
     userName: '',
     targetMoveDate: '',
     aptSize: '1br',
+    city: '',
+    neighborhoods: [...window.MovingApp.DEFAULT_NEIGHBORHOODS],
     annualIncome: 0,
     targetBudgetMin: '',
     targetBudgetMax: '',
@@ -130,10 +298,27 @@ window.MovingApp.defaultState = function() {
     movers: window.MovingApp.MOVERS.reduce((acc, m) => ({ ...acc, [m.name]: false }), {}),
     customMovers: [],
     apartments: [],
+    boxes: [],
+    boxSearch: '',
+    boxStatusFilter: 'all',
+    editingBoxId: '',
     rooms: window.MovingApp.ROOMS.reduce((acc, r) => ({ ...acc, [r]: 'Not started' }), {}),
     roomChecklist: {},
-    utilities: window.MovingApp.UTILITIES.reduce((acc, u) => ({ ...acc, [u]: { oldCancelDate: '', newStartDate: '' } }), {}),
+    utilities: window.MovingApp.UTILITIES.reduce((acc, u) => ({ ...acc, [u]: {
+      oldCancelDate: '',
+      newStartDate: '',
+      provider: '',
+      account: '',
+      confirmation: '',
+      status: 'not-started',
+      action: 'transfer',
+      phone: '',
+      notes: ''
+    } }), {}),
     contacts: { movers: '', doorman: '', newSuper: '', emergency: '' },
+    moverTip: { crewSize: 3, hours: 4, rate: 8, service: 'good' },
+    backupExportedAt: '',
+    celebrationLog: {},
     notes: '',
     activeTab: 'dashboard',
     showWizardOverride: false
@@ -153,18 +338,97 @@ window.MovingApp.migrateApartments = function(apartments) {
   }));
 };
 
+window.MovingApp.sanitizeState = function(input) {
+  const base = window.MovingApp.defaultState();
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return base;
+
+  const merged = Object.assign(base, input);
+  merged.schemaVersion = window.MovingApp.SCHEMA_VERSION;
+  merged.userName = typeof input.userName === 'string' ? input.userName : '';
+  merged.targetMoveDate = typeof input.targetMoveDate === 'string' ? input.targetMoveDate : '';
+  merged.aptSize = ['studio', '1br', '2br', '3br'].includes(input.aptSize) ? input.aptSize : '1br';
+  merged.city = typeof input.city === 'string' ? input.city : '';
+  merged.neighborhoods = Array.isArray(input.neighborhoods)
+    ? input.neighborhoods.map(String).map(x => x.trim()).filter(Boolean).slice(0, 12)
+    : [...window.MovingApp.DEFAULT_NEIGHBORHOODS];
+  merged.annualIncome = Number(input.annualIncome) || 0;
+  merged.targetBudgetMin = input.targetBudgetMin || '';
+  merged.targetBudgetMax = input.targetBudgetMax || '';
+  merged.checked = (input.checked && typeof input.checked === 'object' && !Array.isArray(input.checked)) ? input.checked : {};
+  merged.donations = window.MovingApp.DONATION_CATEGORIES.reduce((acc, cat) => {
+    const items = input.donations && Array.isArray(input.donations[cat]) ? input.donations[cat] : [];
+    acc[cat] = items.map(String);
+    return acc;
+  }, {});
+  merged.apartments = window.MovingApp.migrateApartments(input.apartments);
+  merged.customMovers = Array.isArray(input.customMovers) ? input.customMovers.map(m => ({
+    name: String(m.name || ''),
+    phone: String(m.phone || ''),
+    notes: String(m.notes || '')
+  })).filter(m => m.name) : [];
+  merged.rooms = window.MovingApp.ROOMS.reduce((acc, room) => {
+    const val = input.rooms && window.MovingApp.ROOM_STATUSES.includes(input.rooms[room]) ? input.rooms[room] : 'Not started';
+    acc[room] = val;
+    return acc;
+  }, {});
+  merged.roomChecklist = (input.roomChecklist && typeof input.roomChecklist === 'object' && !Array.isArray(input.roomChecklist)) ? input.roomChecklist : {};
+  merged.utilities = window.MovingApp.UTILITIES.reduce((acc, util) => {
+    const rec = input.utilities && input.utilities[util] && typeof input.utilities[util] === 'object' ? input.utilities[util] : {};
+    acc[util] = {
+      oldCancelDate: rec.oldCancelDate || '',
+      newStartDate: rec.newStartDate || '',
+      provider: rec.provider || '',
+      account: rec.account || '',
+      confirmation: rec.confirmation || '',
+      status: ['not-started', 'scheduled', 'confirmed', 'done'].includes(rec.status) ? rec.status : 'not-started',
+      action: ['transfer', 'cancel', 'start-new', 'ask-building'].includes(rec.action) ? rec.action : 'transfer',
+      phone: rec.phone || '',
+      notes: rec.notes || ''
+    };
+    return acc;
+  }, {});
+  merged.boxes = Array.isArray(input.boxes) ? input.boxes.map((box, idx) => ({
+    id: box.id || ('box-' + Date.now() + '-' + idx),
+    label: box.label || `Box ${idx + 1}`,
+    room: box.room || 'Unassigned',
+    contents: Array.isArray(box.contents) ? box.contents.map(String) : String(box.contents || '').split(',').map(x => x.trim()).filter(Boolean),
+    fragile: !!box.fragile,
+    openFirst: !!box.openFirst,
+    status: ['packed', 'loaded', 'arrived', 'unpacked'].includes(box.status) ? box.status : 'packed'
+  })) : [];
+  merged.boxSearch = typeof input.boxSearch === 'string' ? input.boxSearch : '';
+  merged.boxStatusFilter = ['all', 'open-first', 'fragile', 'packed', 'loaded', 'arrived', 'unpacked'].includes(input.boxStatusFilter) ? input.boxStatusFilter : 'all';
+  merged.editingBoxId = typeof input.editingBoxId === 'string' ? input.editingBoxId : '';
+  merged.contacts = input.contacts && typeof input.contacts === 'object' ? {
+    movers: input.contacts.movers || '',
+    doorman: input.contacts.doorman || '',
+    newSuper: input.contacts.newSuper || '',
+    emergency: input.contacts.emergency || ''
+  } : { movers: '', doorman: '', newSuper: '', emergency: '' };
+  const tip = input.moverTip && typeof input.moverTip === 'object' ? input.moverTip : {};
+  merged.moverTip = {
+    crewSize: Math.max(1, Math.min(12, parseInt(tip.crewSize, 10) || 3)),
+    hours: Math.max(1, Math.min(16, parseFloat(tip.hours) || 4)),
+    rate: Math.max(0, Math.min(50, parseFloat(tip.rate) || 8)),
+    service: ['okay', 'good', 'great'].includes(tip.service) ? tip.service : 'good'
+  };
+  merged.backupExportedAt = typeof input.backupExportedAt === 'string' ? input.backupExportedAt : '';
+  merged.celebrationLog = (input.celebrationLog && typeof input.celebrationLog === 'object' && !Array.isArray(input.celebrationLog)) ? input.celebrationLog : {};
+  merged.notes = typeof input.notes === 'string' ? input.notes : '';
+  const validTabs = ['dashboard', 'aptsearch', 'apartments', 'tasks', 'supplies', 'boxes', 'donations', 'movers', 'rooms', 'addressutil', 'dayof'];
+  merged.activeTab = validTabs.includes(input.activeTab) ? input.activeTab : 'dashboard';
+  merged.showWizardOverride = !!input.showWizardOverride;
+  return merged;
+};
+
 window.MovingApp.loadState = function() {
   try {
     const saved = localStorage.getItem(window.MovingApp.STORAGE_KEY);
-    if (saved) {
-      const merged = Object.assign(window.MovingApp.defaultState(), JSON.parse(saved));
-      merged.apartments = window.MovingApp.migrateApartments(merged.apartments);
-      return merged;
-    }
+    if (saved) return window.MovingApp.sanitizeState(JSON.parse(saved));
   } catch (e) { console.error(e); }
   return window.MovingApp.defaultState();
 };
 
 window.MovingApp.saveState = function(stateData) {
-  try { localStorage.setItem(window.MovingApp.STORAGE_KEY, JSON.stringify(stateData)); } catch (e) { console.error(e); }
+  try { localStorage.setItem(window.MovingApp.STORAGE_KEY, JSON.stringify(window.MovingApp.sanitizeState(stateData))); } catch (e) { console.error(e); }
 };

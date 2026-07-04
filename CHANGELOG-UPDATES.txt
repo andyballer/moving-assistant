@@ -1,0 +1,30 @@
+Moving Assistant — Product Update Changelog
+
+Second implementation pass
+- Added editable city/market and neighborhood chips to Apartment Hunt so the app is less hardcoded to one NYC move.
+- Turned Apartment Hunter guide cards into real checkable action items that count toward progress.
+- Added Dashboard quick actions: focus items can now be opened, and many can be marked done directly from the Dashboard.
+- Added safer celebration tracking for 50%, 100%, first box, and room-complete moments so confetti does not spam repeatedly.
+- Expanded Box Inventory with edit mode, duplicate-label warning, status filters, open-first/fragile counts, and a box summary row.
+- Expanded Address & Utilities from simple dates into provider/action/status/account/confirmation/phone/notes cards.
+- Added Important Contacts for movers, current building, new building, and emergency backup.
+- Expanded Move Day into a richer run sheet: before movers, while loading, final sweep, arrival, and first-night sanity kit.
+- Added a mover tipping guide and calculator with crew size, hours, rate, and service quality.
+- Added PWA update prompt UI so new service-worker versions can be activated with an in-app update button.
+- Renamed the truck asset from “moving truck.webp” to “moving-truck.webp” for safer web paths.
+- Removed inline mobile-menu section navigation handlers and replaced them with event listeners.
+- Improved first-run behavior so the welcome animation does not cover the onboarding wizard for brand-new users.
+
+Previous implementation pass
+- Added index.html and a minimal manifest.json for PWA install support.
+- Updated service worker cache list and versioning.
+- Cached key visual assets, including the moving truck and Apple touch icon.
+- Replaced localStorage.clear() with removal of only this app's storage key.
+- Added state sanitization for safer JSON backup imports.
+- Improved progress calculations using current tasks and item-level room checklist data.
+- Upgraded Dashboard with smarter Today’s Focus recommendations.
+- Added Box Inventory section for searchable packed-box tracking.
+- Added Apartment Hunter strategy cards to Apartment Search.
+- Added utility lead-time nudges for Address & Utilities.
+- Reworked Move Day Survival into before/during/after run-sheet guidance.
+- Cleaned up several corporate-sounding labels and improved product copy.
