@@ -1,5 +1,5 @@
 // Bump this version string on every deploy — it's what forces old caches to clear.
-const CACHE_VERSION = 'moving-assistant-v32';
+const CACHE_VERSION = 'moving-assistant-v38';
 
 const CORE_ASSETS = [
   './',
@@ -7,6 +7,7 @@ const CORE_ASSETS = [
   './manifest.json',
   './src/css/style.css',
   './src/js/state.js',
+  './src/js/apartments.js',
   './src/js/app.js',
   './src/assets/moving-truck.webp',
   './src/assets/moving-truck-clean.png',

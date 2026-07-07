@@ -1,8 +1,18 @@
 window.MovingApp = window.MovingApp || {};
 
-window.MovingApp.APT_STATUSES = ['Inquired', 'Emailed/Called', 'Visited', 'Applied', 'Rejected', 'Lease Signed'];
+window.MovingApp.APT_STATUSES = ['Saved', 'Inquired', 'Heard Back', 'Needs Follow-up', 'Viewing Scheduled', 'Viewed', 'Applied', 'Rejected', 'Lease Signed'];
 window.MovingApp.STORAGE_KEY = 'move-tracker:state:v8';
-window.MovingApp.SCHEMA_VERSION = 9;
+window.MovingApp.STORAGE_BACKUP_KEY = 'move-tracker:state:latest';
+window.MovingApp.LEGACY_STORAGE_KEYS = [
+  'move-tracker:state:v7',
+  'move-tracker:state:v6',
+  'move-tracker:state:v5',
+  'move-tracker:state:v4',
+  'move-tracker:state:v3',
+  'move-tracker:state:v2',
+  'move-tracker:state:v1'
+];
+window.MovingApp.SCHEMA_VERSION = 10;
 
 window.MovingApp.DONATION_CATEGORIES = ['Books', 'Games', 'Clothes', 'Electronics', 'Other'];
 window.MovingApp.ROOMS = ['Kitchen', 'Bedroom', 'Bathroom', 'Closet', 'Living Room', 'Entryway/Storage'];
@@ -158,9 +168,21 @@ window.MovingApp.APT_PHASES = [
 window.MovingApp.APT_HUNT_GUIDES = [
   {
     id: 'renter-resume',
-    title: 'Renter resume',
+    title: 'Renter packet',
     emoji: '📄',
-    items: ['Two recent pay stubs', 'Employment letter', 'Two bank statements', 'Photo ID scan', 'Tax docs if requested']
+    items: ['Now: scan your photo ID and save it as "ID - [Your Name].pdf" so you can attach it in one tap', 'Now: download your two most recent pay stubs; if paid irregularly, also save last year tax docs or offer letter', 'This week: ask HR for an employment letter with title, salary, start date, and contact info', 'This week: download two to three recent bank statements and black out only full account numbers, not balances/name', 'Before tours: save a credit score screenshot or credit report PDF so you can move fast without guessing', 'Before applying: collect previous landlord reference info or proof of on-time rent payments', 'If income is close to the 40x rule: prep guarantor ID, pay stubs, tax return, and bank statements before you tour', 'If you have a pet: make a one-page pet resume with weight, breed, vaccines, references, and a good photo']
+  },
+  {
+    id: 'cashiers-check',
+    title: 'Cashier check prep',
+    emoji: '🏦',
+    items: ['Before serious tours: ask each agent what move-in payment types they accept: cashier check, certified check, money order, ACH, or portal', '3-5 business days before you may apply: transfer move-in funds from the credit union to a bank with a nearby branch', 'Before ordering checks: ask for the exact payable-to name and amount; do not guess the payee', 'Before applying: estimate first month + security deposit + any legal broker fee so the right cash is liquid', 'Same day you are approved: go to the branch for checks only after the lease/payment instructions are confirmed in writing', 'At handoff: get receipts for cashier check, certified check, money order, or cash payments and save photos in your apartment folder']
+  },
+  {
+    id: 'best-candidate',
+    title: 'Best-candidate polish',
+    emoji: '✅',
+    items: ['Now: keep one folder named "Rental Packet" with PDFs named clearly so agents trust the file set', 'Before messaging: write a short renter bio with move date, occupants, pets, income fit, and viewing availability', 'Before tours: know your 40x rent ceiling and your guarantor plan so you can answer instantly', 'Before applying: prepare employer, income, current landlord, references, desired lease start, and occupant details', 'Same day after viewing: if you want the apartment, send a concise follow-up and ask for the application/payment steps']
   },
   {
     id: 'tour-detective',
@@ -334,6 +356,7 @@ window.MovingApp.defaultState = function() {
     movers: window.MovingApp.MOVERS.reduce((acc, m) => ({ ...acc, [m.name]: false }), {}),
     customMovers: [],
     apartments: [],
+    aptFilter: 'all',
     boxes: [],
     boxSearch: '',
     boxStatusFilter: 'all',
@@ -369,9 +392,18 @@ window.MovingApp.migrateApartments = function(apartments) {
   return apartments.map(a => ({
     ...a,
     links: Array.isArray(a.links) ? a.links : (a.url ? [a.url] : []),
+    status: window.MovingApp.APT_STATUSES.includes(a.status) ? a.status : (a.status === 'Emailed/Called' ? 'Inquired' : (a.status === 'Visited' ? 'Viewed' : 'Saved')),
     favorite: typeof a.favorite === 'boolean' ? a.favorite : false,
     image: a.image || null,
-    imageStatus: a.imageStatus || 'none' // 'none' | 'auto' | 'manual'
+    imageStatus: a.imageStatus || 'none', // 'none' | 'auto' | 'manual'
+    realtorName: a.realtorName || '',
+    lastContactDate: a.lastContactDate || '',
+    viewedDate: a.viewedDate || '',
+    followUpDate: a.followUpDate || '',
+    applicationDueDate: a.applicationDueDate || '',
+    cashierCheckNeeded: !!a.cashierCheckNeeded,
+    cashierCheckBy: a.cashierCheckBy || '',
+    notes: a.notes || ''
   }));
 };
 
@@ -398,6 +430,7 @@ window.MovingApp.sanitizeState = function(input) {
     return acc;
   }, {});
   merged.apartments = window.MovingApp.migrateApartments(input.apartments);
+  merged.aptFilter = ['all', 'favorites', 'followup'].includes(input.aptFilter) ? input.aptFilter : 'all';
   merged.customMovers = Array.isArray(input.customMovers) ? input.customMovers.map(m => ({
     name: String(m.name || ''),
     phone: String(m.phone || ''),
@@ -466,14 +499,39 @@ window.MovingApp.sanitizeState = function(input) {
   return merged;
 };
 
+window.MovingApp.storageKeys = function() {
+  return [
+    window.MovingApp.STORAGE_KEY,
+    window.MovingApp.STORAGE_BACKUP_KEY,
+    ...(window.MovingApp.LEGACY_STORAGE_KEYS || [])
+  ];
+};
+
 window.MovingApp.loadState = function() {
   try {
-    const saved = localStorage.getItem(window.MovingApp.STORAGE_KEY);
-    if (saved) return window.MovingApp.sanitizeState(JSON.parse(saved));
+    const keys = window.MovingApp.storageKeys();
+    for (const key of keys) {
+      const saved = localStorage.getItem(key);
+      if (!saved) continue;
+      const migrated = window.MovingApp.sanitizeState(JSON.parse(saved));
+      if (key !== window.MovingApp.STORAGE_KEY) window.MovingApp.saveState(migrated);
+      return migrated;
+    }
   } catch (e) { console.error(e); }
   return window.MovingApp.defaultState();
 };
 
 window.MovingApp.saveState = function(stateData) {
-  try { localStorage.setItem(window.MovingApp.STORAGE_KEY, JSON.stringify(window.MovingApp.sanitizeState(stateData))); } catch (e) { console.error(e); }
+  try {
+    const sanitized = window.MovingApp.sanitizeState(stateData);
+    const serialized = JSON.stringify(sanitized);
+    localStorage.setItem(window.MovingApp.STORAGE_KEY, serialized);
+    localStorage.setItem(window.MovingApp.STORAGE_BACKUP_KEY, serialized);
+  } catch (e) { console.error(e); }
+};
+
+window.MovingApp.clearStoredState = function() {
+  try {
+    window.MovingApp.storageKeys().forEach(key => localStorage.removeItem(key));
+  } catch (e) { console.error(e); }
 };
