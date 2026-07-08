@@ -376,12 +376,17 @@ window.MovingApartments = (function() {
                   <strong>${items.length}</strong>
                 </div>
                 <div class="mt-pipeline-items">
-                  ${items.length ? items.slice(0, 4).map(a => `
+                  ${items.length ? items.slice(0, 4).map(a => {
+                    const idx = list.indexOf(a);
+                    return `
                     <div class="mt-pipeline-item">
-                      <strong>${esc(a.name || 'Untitled apartment')}</strong>
-                      <span>${a.price ? '$' + parseFloat(a.price).toLocaleString() + '/mo' : 'Rent TBD'}${a.followUpDate ? ` · Follow up ${esc(a.followUpDate)}` : ''}</span>
+                      <div class="mt-pipeline-item-main">
+                        <strong>${esc(a.name || 'Untitled apartment')}</strong>
+                        <span>${a.price ? '$' + parseFloat(a.price).toLocaleString() + '/mo' : 'Rent TBD'}${a.followUpDate ? ` · Follow up ${esc(a.followUpDate)}` : ''}</span>
+                      </div>
+                      <button class="mt-pipeline-remove" data-apt-remove="${idx}" aria-label="Delete ${esc(a.name || 'apartment')}">🗑</button>
                     </div>
-                  `).join('') : '<em>No listings</em>'}
+                  `; }).join('') : '<em>No listings</em>'}
                   ${items.length > 4 ? `<em>+${items.length - 4} more</em>` : ''}
                 </div>
               </div>
@@ -706,6 +711,7 @@ window.MovingApartments = (function() {
     root.querySelectorAll('[data-apt-remove]').forEach(btn => {
       btn.addEventListener('click', () => {
         const idx = parseInt(btn.getAttribute('data-apt-remove'), 10);
+        if (!confirm('Delete this apartment from your tracker?')) return;
         state.apartments.splice(idx, 1);
         AppEngine.saveState(state);
         render();

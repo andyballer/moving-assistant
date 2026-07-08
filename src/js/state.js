@@ -113,13 +113,111 @@ window.MovingApp.MOVE_DAY_STAGES = [
 ];
 
 window.MovingApp.MOVERS = [
-  { name: 'Roadway Moving', phone: '(212) 812-5240', price: 'Flat-rate quote, mid-to-upper range', desc: 'Reliable full-service standard, dedicated coordinators, binding estimates.' },
-  { name: 'FlatRate Moving', phone: '(212) 988-9292', price: '$900-$1,400 for a 1BR local move (flat-rate)', desc: 'Originator of guaranteed flat-rate pricing, no surprise hourly overage.' },
-  { name: 'Dumbo Moving & Storage', phone: '(718) 222-8282', price: 'Flat per-job pricing, generally competitive/affordable', desc: 'Well-reviewed, BBB-accredited since 2012, strong if either end is in Brooklyn.' },
-  { name: 'Zip to Zip Moving', phone: '(929) 990-2060', price: 'Avg. ~$678 for a 1BR full-service move', desc: 'Frequently top-rated for in-city moves.' },
-  { name: 'Oz Moving & Storage', phone: '(212) 452-6683', price: 'Mid-to-upper range, hourly or flat-rate', desc: 'Operating since 1993, one of the longest-running NYC movers — full residential, commercial, interstate, and storage.' },
-  { name: 'JP Urban Moving', phone: '(718) 965-1925', price: 'Mid-to-premium, hourly', desc: 'Brooklyn-based, highly rated, experienced with strict NYC building compliance (COI, elevator scheduling) and white-glove/art handling.' },
-  { name: 'Metropolis Moving', phone: '(718) 710-4520', price: 'Transparent hourly pricing, budget-friendly', desc: 'Brooklyn-based, popular with young professionals doing apartment moves; smaller crews, good price-to-service balance.' }
+  {
+    name: 'Roadway Moving',
+    phone: '(212) 812-5240',
+    website: 'https://www.roadwaymoving.com/',
+    reviewUrl: 'https://www.google.com/search?q=Roadway+Moving+NYC+reviews',
+    quoteUrl: 'https://www.roadwaymoving.com/',
+    rating: 'Google 4.9 / 5',
+    ratingNote: 'Site cites 7,392 Google reviews; verify live before booking.',
+    pricingModel: 'Premium fixed quote',
+    estimateBySize: { studio: [850, 1500], '1br': [1200, 2200], '2br': [1800, 3200], '3br': [2600, 4600] },
+    includes: 'Labor, transportation, gas, tolls, standard wrapping, COI support, and tracking on many moves.',
+    watchFor: 'Usually not the cheapest; best when timing, COI, and careful handling matter more than lowest price.',
+    bestFor: 'White-glove local moves, complex buildings, long distance, and higher-touch coordination.',
+    desc: 'Reliable full-service standard, dedicated coordinators, binding estimates.'
+  },
+  {
+    name: 'FlatRate Moving',
+    phone: '(212) 988-9292',
+    website: 'https://www.flatrate.com/',
+    reviewUrl: 'https://www.google.com/search?q=FlatRate+Moving+NYC+reviews',
+    quoteUrl: 'https://www.flatrate.com/',
+    rating: 'Google 4.7 / 5',
+    ratingNote: 'Site cites 4.87 average across 11,225 reviews from 5 sources.',
+    pricingModel: 'Guaranteed flat rate',
+    estimateBySize: { studio: [750, 1350], '1br': [1000, 1900], '2br': [1600, 2900], '3br': [2300, 4200] },
+    includes: 'Flat-rate labor, truck, equipment, fuel, tolls, basic disassembly/reassembly, and quoted access details.',
+    watchFor: 'Quote accuracy depends on inventory and access details; be painfully specific about stairs, long carries, and packing.',
+    bestFor: 'People who hate hourly uncertainty and want a single all-in quote.',
+    desc: 'Originator of guaranteed flat-rate pricing, no surprise hourly overage.'
+  },
+  {
+    name: 'Dumbo Moving & Storage',
+    phone: '(718) 222-8282',
+    website: 'https://dumbomoving.com/',
+    reviewUrl: 'https://www.google.com/search?q=Dumbo+Moving+Storage+NYC+reviews',
+    quoteUrl: 'https://dumbomoving.com/',
+    rating: 'Review check needed',
+    ratingNote: 'Site emphasizes Google, Trustpilot, and BBB reviews; verify current score live.',
+    pricingModel: 'Locked itemized quote',
+    estimateBySize: { studio: [650, 1100], '1br': [850, 1600], '2br': [1300, 2400], '3br': [1900, 3400] },
+    includes: 'Labor, truck, fuel, tolls, supplies/protection, COIs, elevator coordination, and parking permits in quoted scope.',
+    watchFor: 'Very quote-driven; confirm whether packing supplies, boxes, storage, or last-minute changes affect the price.',
+    bestFor: 'Budget-conscious NYC apartment moves, Brooklyn-heavy routes, and locked-price planning.',
+    desc: 'Competitive all-inclusive quotes and strong NYC apartment-move familiarity.'
+  },
+  {
+    name: 'Zip to Zip Moving',
+    phone: '(929) 990-2060',
+    website: 'https://ziptozipmoving.com/',
+    reviewUrl: 'https://www.google.com/search?q=Zip+to+Zip+Moving+NYC+reviews',
+    quoteUrl: 'https://ziptozipmoving.com/',
+    rating: 'Review check needed',
+    ratingNote: 'Use live Google/Yelp checks; service footprint can vary by crew and route.',
+    pricingModel: 'Quote-based value option',
+    estimateBySize: { studio: [650, 1100], '1br': [850, 1500], '2br': [1300, 2300], '3br': [1850, 3300] },
+    includes: 'Typically quote-based labor/truck move; confirm COI, materials, stairs, and travel fees in writing.',
+    watchFor: 'Get building-access fees, COI timing, and stair/long-carry terms written into the quote.',
+    bestFor: 'Value shopping when you can compare details against 2-3 other written quotes.',
+    desc: 'Often competitive for local/regional moves; verify current NYC review quality before booking.'
+  },
+  {
+    name: 'Oz Moving & Storage',
+    phone: '(212) 452-6683',
+    website: 'https://ozmoving.com/',
+    reviewUrl: 'https://www.google.com/search?q=Oz+Moving+Storage+NYC+reviews',
+    quoteUrl: 'https://ozmoving.com/',
+    rating: 'Google 4.7 / 5',
+    ratingNote: 'Site cites 4.7 from over 1,300 Google reviews and A+ BBB.',
+    pricingModel: 'Guaranteed services quote',
+    estimateBySize: { studio: [700, 1300], '1br': [900, 1800], '2br': [1500, 2800], '3br': [2200, 4000] },
+    includes: 'Labor/travel, COI, furniture wrapping, floor/corner protection, storage options, and package tiers.',
+    watchFor: 'Package level matters; confirm what is included versus requested in advance.',
+    bestFor: 'Traditional full-service moves, storage needs, and larger apartment moves.',
+    desc: 'Long-running NYC mover with full residential, commercial, interstate, and storage service.'
+  },
+  {
+    name: 'JP Urban Moving',
+    phone: '(718) 965-1925',
+    website: 'https://www.jpurbanmoving.com/',
+    reviewUrl: 'https://www.google.com/search?q=JP+Urban+Moving+NYC+reviews',
+    quoteUrl: 'https://www.jpurbanmoving.com/',
+    rating: 'A+ BBB / review check',
+    ratingNote: 'Site cites A+ BBB and thousands of reviews; verify live Google/Yelp score.',
+    pricingModel: 'Hourly or guaranteed quote',
+    estimateBySize: { studio: [800, 1450], '1br': [1100, 2100], '2br': [1700, 3200], '3br': [2500, 4500] },
+    includes: 'Video walkthrough planning, in-house crews, COI, basic disassembly/reassembly, protection, wardrobe boxes, labor/truck/travel.',
+    watchFor: 'Good fit for complex logistics; may price above budget movers for smaller/simple moves.',
+    bestFor: 'Brooklyn/Manhattan building logistics, COIs, white-glove local moves, and careful prep.',
+    desc: 'Brooklyn-based, experienced with strict NYC building compliance and careful handling.'
+  },
+  {
+    name: 'Metropolis Moving',
+    phone: '(718) 710-4520',
+    website: 'https://metropolismoving.com/',
+    reviewUrl: 'https://www.google.com/search?q=Metropolis+Moving+NYC+reviews',
+    quoteUrl: 'https://metropolismoving.com/',
+    rating: 'Google 5.0 / 5',
+    ratingNote: 'Site cites 5/5 from 590 Google reviews and 4.9/5 on Yelp.',
+    pricingModel: 'Fixed-rate quote',
+    estimateBySize: { studio: [650, 1150], '1br': [850, 1550], '2br': [1300, 2400], '3br': [1900, 3400] },
+    includes: 'Fixed-rate residential moving, packing options, plastic box rental, and local NYC building experience.',
+    watchFor: 'Storage/options may be more limited than larger national-style movers; confirm add-ons.',
+    bestFor: 'Inter-borough moves, Brooklyn routes, and smaller full-service moves with strong review signals.',
+    desc: 'Brooklyn-based, popular with young professionals doing apartment moves; good price-to-service balance.'
+  }
 ];
 
 window.MovingApp.MOVE_TIPS = [
@@ -431,11 +529,15 @@ window.MovingApp.sanitizeState = function(input) {
   }, {});
   merged.apartments = window.MovingApp.migrateApartments(input.apartments);
   merged.aptFilter = ['all', 'favorites', 'followup'].includes(input.aptFilter) ? input.aptFilter : 'all';
-  merged.customMovers = Array.isArray(input.customMovers) ? input.customMovers.map(m => ({
-    name: String(m.name || ''),
-    phone: String(m.phone || ''),
-    notes: String(m.notes || '')
-  })).filter(m => m.name) : [];
+  merged.customMovers = Array.isArray(input.customMovers) ? input.customMovers.map(m => {
+    const quote = parseFloat(m.quoteAmount);
+    return {
+      name: String(m.name || ''),
+      phone: String(m.phone || ''),
+      quoteAmount: Number.isFinite(quote) && quote > 0 ? String(quote) : '',
+      notes: String(m.notes || '')
+    };
+  }).filter(m => m.name) : [];
   merged.rooms = window.MovingApp.ROOMS.reduce((acc, room) => {
     const val = input.rooms && window.MovingApp.ROOM_STATUSES.includes(input.rooms[room]) ? input.rooms[room] : 'Not started';
     acc[room] = val;
