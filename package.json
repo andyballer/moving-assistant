@@ -1,0 +1,10 @@
+{
+  "name": "moving-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A static moving dashboard for apartment hunting, packing, utilities, movers, and move-day planning.",
+  "scripts": {
+    "test": "node --test",
+    "check:js": "node --check src/js/state.js && node --check src/js/apartments.js && node --check src/js/boxes.js && node --check src/js/movers.js && node --check src/js/app.js && node --check sw.js"
+  }
+}

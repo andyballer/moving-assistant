@@ -23,6 +23,32 @@ const appSections = [
   { id: 'dayof', label: 'Move Day', icon: '🎯', category: 'moveout' }
 ];
 
+function getMoveProfile() {
+  return state.moveProfile || {};
+}
+
+function needsApartmentHunt() {
+  return getMoveProfile().apartmentHunt !== false;
+}
+
+function usesProfessionalMovers() {
+  return getMoveProfile().moveStyle !== 'diy';
+}
+
+function getVisibleAppSections() {
+  return appSections.filter(sec => {
+    if (sec.category === 'apartment' && !needsApartmentHunt()) return false;
+    if (sec.id === 'movers' && !usesProfessionalMovers()) return false;
+    return true;
+  });
+}
+
+function ensureVisibleActiveTab() {
+  if (getVisibleAppSections().some(sec => sec.id === state.activeTab)) return;
+  state.activeTab = 'dashboard';
+  AppEngine.saveState(state);
+}
+
 // --- CORE ANIMATION / WELCOME ---
 function renderWelcomeSceneHtml(contentHtml) {
   return `
@@ -48,6 +74,7 @@ function renderWelcomeSceneHtml(contentHtml) {
 }
 
 function getSetupFormHtml() {
+  const profile = getMoveProfile();
   return `
     <h1>Moving Assistant</h1>
     <p class="mt-welcome-subcopy">Tell me the basics and I’ll build the move plan around them.</p>
@@ -63,6 +90,31 @@ function getSetupFormHtml() {
           <option value="3br" ${state.aptSize === '3br' ? 'selected' : ''}>3-Bedroom Apartment</option>
         </select>
       </div>
+      <div class="mt-wizard-field"><label>City / market</label><input type="text" id="wiz-city" placeholder="e.g. New York, Chicago, Austin" value="${esc(state.city || '')}" /></div>
+      <div class="mt-wizard-field">
+        <label>Do you still need to find a place?</label>
+        <select id="wiz-apartment-hunt">
+          <option value="yes" ${profile.apartmentHunt !== false ? 'selected' : ''}>Yes, include apartment hunt tools</option>
+          <option value="no" ${profile.apartmentHunt === false ? 'selected' : ''}>No, I already have the place</option>
+        </select>
+      </div>
+      <div class="mt-wizard-field">
+        <label>Move help</label>
+        <select id="wiz-move-style">
+          <option value="movers" ${profile.moveStyle !== 'diy' ? 'selected' : ''}>Hiring movers / comparing quotes</option>
+          <option value="diy" ${profile.moveStyle === 'diy' ? 'selected' : ''}>DIY / friends / rental vehicle</option>
+        </select>
+      </div>
+      <div class="mt-two-col-form mt-profile-grid">
+        <label>Move distance<select id="wiz-distance">
+          <option value="local" ${profile.distance !== 'long-distance' ? 'selected' : ''}>Local</option>
+          <option value="long-distance" ${profile.distance === 'long-distance' ? 'selected' : ''}>Long-distance</option>
+        </select></label>
+        <label>Home type<select id="wiz-building-type">
+          <option value="apartment" ${profile.buildingType !== 'house' ? 'selected' : ''}>Apartment / building</option>
+          <option value="house" ${profile.buildingType === 'house' ? 'selected' : ''}>House / standalone</option>
+        </select></label>
+      </div>
       <button class="mt-wizard-btn" id="wiz-submit">Build My Move Plan</button>
     </div>
   `;
@@ -75,11 +127,27 @@ function bindSetupForm(root) {
     const name = root.querySelector('#wiz-name').value.trim();
     const date = root.querySelector('#wiz-date').value;
     const size = root.querySelector('#wiz-size').value;
+    const city = root.querySelector('#wiz-city').value.trim();
+    const apartmentHunt = root.querySelector('#wiz-apartment-hunt').value === 'yes';
+    const moveStyle = root.querySelector('#wiz-move-style').value;
+    const distance = root.querySelector('#wiz-distance').value;
+    const buildingType = root.querySelector('#wiz-building-type').value;
     if (!name || !date) return alert('Just need your name and move date to get started!');
     state.userName = name;
     state.targetMoveDate = date;
     state.aptSize = size;
+    state.city = city;
+    state.moveProfile = {
+      ...(state.moveProfile || {}),
+      market: city && !/new york|nyc/i.test(city) ? 'other' : 'nyc',
+      distance,
+      housing: 'renter',
+      apartmentHunt,
+      moveStyle,
+      buildingType
+    };
     state.showWizardOverride = false;
+    ensureVisibleActiveTab();
     AppEngine.saveState(state);
     sessionStorage.removeItem('hasAnimated');
     render();
@@ -185,9 +253,10 @@ window.openMobileMenu = function() {
       <span>${sec.label}</span>
     </button>
   `;
-  const generalSecs = appSections.filter(s => s.category === 'general');
-  const aptSecs = appSections.filter(s => s.category === 'apartment');
-  const moveoutSecs = appSections.filter(s => s.category === 'moveout');
+  const visibleSections = getVisibleAppSections();
+  const generalSecs = visibleSections.filter(s => s.category === 'general');
+  const aptSecs = visibleSections.filter(s => s.category === 'apartment');
+  const moveoutSecs = visibleSections.filter(s => s.category === 'moveout');
 
   overlay.innerHTML = `
     <div class="mt-mobile-menu-header">
@@ -198,10 +267,12 @@ window.openMobileMenu = function() {
       ${generalSecs.map(bubble).join('')}
     </div>
     <div class="mt-mobile-groups">
-      <div class="mt-mobile-column">
-        <div class="mt-mobile-column-title">🔑 Finding an Apartment</div>
-        <div class="mt-mobile-grid-bubbles">${aptSecs.map(bubble).join('')}</div>
-      </div>
+      ${aptSecs.length ? `
+        <div class="mt-mobile-column">
+          <div class="mt-mobile-column-title">🔑 Finding an Apartment</div>
+          <div class="mt-mobile-grid-bubbles">${aptSecs.map(bubble).join('')}</div>
+        </div>
+      ` : ''}
       <div class="mt-mobile-column">
         <div class="mt-mobile-column-title">📦 Moving Out</div>
         <div class="mt-mobile-grid-bubbles">${moveoutSecs.map(bubble).join('')}</div>
@@ -263,6 +334,8 @@ function getKnownCheckKeys() {
   Object.entries(AppEngine.DONATION_GUIDE || {}).forEach(([room, items]) => {
     if (Array.isArray(items)) items.forEach((_, i) => keys.push(`donation-${room}-${i}`));
   });
+  (AppEngine.INSTALLED_ITEM_REMINDERS || []).forEach((_, i) => keys.push(`installed-${i}`));
+  (AppEngine.BULKY_DONATION_RULES || []).forEach((_, i) => keys.push(`bulky-donation-${i}`));
   AppEngine.SUPPLIES.forEach((_, i) => keys.push('supply-' + i));
   AppEngine.ADDRESS_CHANGES.forEach((_, i) => keys.push('addr-' + i));
   (AppEngine.SAVINGS_PLAYS || []).forEach((_, i) => keys.push('saving-' + i));
@@ -407,6 +480,29 @@ function apartmentCtx(root) {
   };
 }
 
+function boxesCtx(root) {
+  return {
+    AppEngine,
+    state,
+    esc,
+    getPctDone,
+    celebrateOnce,
+    maybeCelebrateProgress,
+    root,
+    render
+  };
+}
+
+function moversCtx(root) {
+  return {
+    AppEngine,
+    state,
+    esc,
+    root,
+    render
+  };
+}
+
 function getApartmentGuideFocusItem() {
   return window.MovingApartments.guideFocusItem(apartmentCtx());
 }
@@ -442,11 +538,13 @@ function getTodaysFocusItems() {
   const timeline = getPhaseFocusItem(AppEngine.TIMELINE_DATA_MATRIX, { timingAware: true });
   if (timeline) items.push(timeline);
 
-  const apt = getPhaseFocusItem(AppEngine.APT_PHASES, { timingAware: true }) || getApartmentGuideFocusItem();
-  if (apt) items.push(apt);
+  if (needsApartmentHunt()) {
+    const apt = getPhaseFocusItem(AppEngine.APT_PHASES, { timingAware: true }) || getApartmentGuideFocusItem();
+    if (apt) items.push(apt);
 
-  const aptTracker = getApartmentTrackerFocusItem();
-  if (aptTracker) items.push(aptTracker);
+    const aptTracker = getApartmentTrackerFocusItem();
+    if (aptTracker) items.push(aptTracker);
+  }
 
   const box = getBoxFocusItem();
   if (box) items.push(box);
@@ -573,17 +671,24 @@ function renderSidebar() {
   const total = totalTaskCount();
   const done = doneTaskCount();
   const pct = total ? Math.round((done / total) * 100) : 0;
+  const visibleSections = getVisibleAppSections();
   const groupedSections = [
-    { title: 'Home', sections: appSections.filter(s => s.category === 'general') },
-    { title: 'Finding an Apartment', sections: appSections.filter(s => s.category === 'apartment') },
-    { title: 'Moving Out', sections: appSections.filter(s => s.category === 'moveout') }
-  ];
+    { title: 'Home', sections: visibleSections.filter(s => s.category === 'general') },
+    { title: 'Finding an Apartment', sections: visibleSections.filter(s => s.category === 'apartment') },
+    { title: 'Moving Out', sections: visibleSections.filter(s => s.category === 'moveout') }
+  ].filter(group => group.sections.length);
+  const profile = getMoveProfile();
+  const profileLabel = [
+    profile.distance === 'long-distance' ? 'Long-distance' : 'Local',
+    profile.moveStyle === 'diy' ? 'DIY move' : 'mover-assisted',
+    state.aptSize.toUpperCase()
+  ].join(' · ');
 
   return `
     <div class="mt-sidebar">
       <div class="mt-sidebar-top">
         <div class="mt-user-badge">
-          <div class="welcome">Packing for a ${state.aptSize.toUpperCase()}</div>
+          <div class="welcome">${esc(profileLabel)}</div>
           <div class="username">${esc(state.userName || 'Friend')}</div>
         </div>
         <div class="mt-nav">
@@ -615,41 +720,73 @@ function renderDashboard() {
   const done = doneTaskCount();
   const pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
   const focusItems = getTodaysFocusItems();
-  const apartmentActions = getApartmentActionItems();
+  const apartmentActions = needsApartmentHunt() ? getApartmentActionItems() : [];
   const packedRooms = AppEngine.ROOMS.filter(r => state.rooms[r] === 'Packed').length;
   const boxCount = (state.boxes || []).length;
   const openFirstCount = (state.boxes || []).filter(b => b.openFirst && b.status !== 'unpacked').length;
   const utilitiesDone = AppEngine.UTILITIES.filter(u => (state.utilities[u] || {}).status === 'done').length;
   const backupText = state.backupExportedAt ? `Last backup: ${new Date(state.backupExportedAt).toLocaleDateString()}` : 'No backup yet';
   const savings = estimateSavings();
+  const primaryFocus = focusItems[0];
+  const secondaryFocus = focusItems.slice(1);
+  const signalCards = [
+    { label: 'Rooms packed', value: `${packedRooms}/${AppEngine.ROOMS.length}`, tab: 'rooms' },
+    { label: 'Boxes logged', value: boxCount, tab: 'boxes' },
+    { label: 'Open first', value: openFirstCount, tab: 'boxes' },
+    { label: 'Utilities done', value: `${utilitiesDone}/${AppEngine.UTILITIES.length}`, tab: 'addressutil' },
+    { label: 'Backup', value: state.backupExportedAt ? 'Saved' : 'Needed', tab: 'dashboard' }
+  ];
 
   return `
-    <div style="padding: 10px 0;">
+    <div class="mt-dashboard-shell">
       <div class="mt-hero-card">
+        <div class="mt-dashboard-kicker">${days <= 7 ? 'Move week command center' : 'Move command center'}</div>
         <h1>${getGreeting()}, ${esc(state.userName || 'friend')} 👋</h1>
         <p>${days <= 7 ? 'Home stretch. We are making this annoyingly manageable.' : 'One small win at a time. Cardboard fears you.'}</p>
 
-        <div class="mt-recommendation">
-          <h3>Today's focus</h3>
-          <div class="mt-focus-list">
-            ${focusItems.map(item => `
-              <div class="mt-focus-row">
-                <button class="mt-focus-main" data-focus-open="${esc(item.tab)}">
-                  <span class="mt-focus-text">${esc(item.text)}</span>
-                  <small>${esc(item.phase)}</small>
-                </button>
-                ${renderFocusDoneButton(item)}
-              </div>
-            `).join('')}
-          </div>
+        <div class="mt-command-grid">
+          <section class="mt-primary-action">
+            <div class="mt-command-label">Do next</div>
+            <button class="mt-primary-action-main" data-focus-open="${esc(primaryFocus.tab)}">
+              <span>${esc(primaryFocus.text)}</span>
+              <small>${esc(primaryFocus.phase)}</small>
+            </button>
+            ${renderFocusDoneButton(primaryFocus)}
+          </section>
+
+          <section class="mt-up-next-panel">
+            <div class="mt-command-label">Up next</div>
+            <div class="mt-focus-list">
+              ${secondaryFocus.length ? secondaryFocus.map(item => `
+                <div class="mt-focus-row">
+                  <button class="mt-focus-main" data-focus-open="${esc(item.tab)}">
+                    <span class="mt-focus-text">${esc(item.text)}</span>
+                    <small>${esc(item.phase)}</small>
+                  </button>
+                  ${renderFocusDoneButton(item)}
+                </div>
+              `).join('') : `
+                <div class="mt-empty mt-dashboard-empty">No other urgent items right now.</div>
+              `}
+            </div>
+          </section>
         </div>
 
-        <div class="mt-progress-container" style="max-width: 420px; margin: 30px auto 0 auto;">
+        <div class="mt-progress-container">
           <div class="mt-progress-track">
             <div class="mt-progress-fill" style="width:${pct}%"></div>
           </div>
-          <p style="margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--text-muted);">${pct}% done · ${done}/${total} tiny wins · ${esc(backupText)}</p>
+          <p>${pct}% done · ${done}/${total} tiny wins · ${esc(backupText)}</p>
         </div>
+      </div>
+
+      <div class="mt-dashboard-signals">
+        ${signalCards.map(card => `
+          <button class="mt-signal-card" data-focus-open="${esc(card.tab)}">
+            <span>${esc(card.label)}</span>
+            <strong>${esc(card.value)}</strong>
+          </button>
+        `).join('')}
       </div>
 
       <div class="mt-dashboard-metrics">
@@ -675,7 +812,7 @@ function renderDashboard() {
         <p style="margin: 0; font-size: 13.5px; font-weight: 600; text-align:center; color: var(--text-main);">${esc(getFunStat())}${openFirstCount ? ` · ${openFirstCount} open-first box${openFirstCount === 1 ? '' : 'es'} should stay easy to grab.` : ''}</p>
       </div>
 
-      <div class="mt-card mt-apartment-actions">
+      ${needsApartmentHunt() ? `<div class="mt-card mt-apartment-actions">
         <div class="mt-card-header">
           <h3>Apartment actions</h3>
           <button class="mt-mini-action" data-focus-open="apartments">Open tracker</button>
@@ -692,7 +829,7 @@ function renderDashboard() {
             <div class="mt-empty">No apartment deadlines yet. Add follow-up dates, apply-by dates, or cashier-check dates as listings get serious.</div>
           `}
         </div>
-      </div>
+      </div>` : ''}
     </div>
   `;
 }
@@ -814,16 +951,7 @@ function renderApartments() {
 }
 
 function getMoverTipSummary() {
-  const tip = state.moverTip || { crewSize: 3, hours: 4, rate: 8, service: 'good' };
-  const serviceMultiplier = tip.service === 'great' ? 1.25 : (tip.service === 'okay' ? 0.8 : 1);
-  const perMover = Math.max(0, Math.round((tip.hours || 0) * (tip.rate || 0) * serviceMultiplier));
-  const totalTip = perMover * (tip.crewSize || 0);
-  return { tip, perMover, totalTip };
-}
-
-function formatMoneyRange(range) {
-  if (!range || range.length < 2) return 'Quote required';
-  return `$${range[0].toLocaleString()}-$${range[1].toLocaleString()}`;
+  return window.MovingMovers.getMoverTipSummary(moversCtx());
 }
 
 function renderSupplies() {
@@ -866,109 +994,7 @@ function renderSupplies() {
 }
 
 function renderMovers() {
-  const { tip, perMover, totalTip } = getMoverTipSummary();
-  const sizeLabels = { studio: 'studio', '1br': '1BR', '2br': '2BR', '3br': '3BR' };
-  const moveSize = state.aptSize || '1br';
-  const sizeLabel = sizeLabels[moveSize] || '1BR';
-  return `
-    <div class="mt-alert-box">
-      <strong>Planning estimate:</strong> prices below are rough local NYC apartment-move ranges for a ${esc(sizeLabel)} before packing add-ons, storage, specialty items, parking surprises, or insurance upgrades. Get written quotes and verify live reviews before booking.
-    </div>
-
-    <div class="mt-card mt-mover-budget-card">
-      <div class="mt-card-header"><h3>Tip + total assumptions</h3></div>
-      <div class="mt-card-body">
-        <div class="mt-util-fields">
-          <label>Crew size<input type="number" min="1" max="12" data-tip-field="crewSize" value="${esc(tip.crewSize || 3)}" /></label>
-          <label>Hours worked<input type="number" min="1" max="16" step="0.5" data-tip-field="hours" value="${esc(tip.hours || 4)}" /></label>
-          <label>Base $ / mover / hour<input type="number" min="0" max="50" step="1" data-tip-field="rate" value="${esc(tip.rate || 8)}" /></label>
-          <label>Service vibe<select data-tip-field="service">
-            <option value="okay" ${tip.service === 'okay' ? 'selected' : ''}>Okay / basic</option>
-            <option value="good" ${tip.service === 'good' ? 'selected' : ''}>Good</option>
-            <option value="great" ${tip.service === 'great' ? 'selected' : ''}>Great / lifesavers</option>
-          </select></label>
-        </div>
-        <div class="mt-tip-result">
-          <div><span>Suggested per mover</span><strong>$${perMover.toLocaleString()}</strong></div>
-          <div><span>Total tip to budget</span><strong>$${totalTip.toLocaleString()}</strong></div>
-        </div>
-        <p class="mt-muted-copy">The mover cards add this tip to each brand estimate so the comparison feels closer to your real cash outlay. Tip usually is not included in mover quotes.</p>
-      </div>
-    </div>
-
-    <div class="mt-card" style="margin-bottom: 20px;">
-      <div class="mt-card-header"><h3>Starter mover comparison</h3></div>
-      <div class="mt-card-body">
-        <p class="mt-muted-copy" style="margin-top:0;">These are starter defaults. Add/edit your own quotes below, especially if your move is outside NYC or has unusual access.</p>
-        <div class="mt-mover-grid">
-          ${AppEngine.MOVERS.map(m => {
-            const range = (m.estimateBySize || {})[moveSize] || (m.estimateBySize || {})['1br'];
-            const totalRange = range ? [range[0] + totalTip, range[1] + totalTip] : null;
-            return `
-            <div class="mt-mover">
-              <div class="mt-mover-head">
-                <h4>${esc(m.name)}</h4>
-                <span class="mt-rating-pill">${esc(m.rating || 'Review check')}</span>
-              </div>
-              <p style="color:var(--accent-primary); font-weight:600; font-family:monospace; margin:4px 0;">${esc(m.phone)}</p>
-              <p>${esc(m.desc)}</p>
-              <div class="mt-mover-cost-grid">
-                <div><span>Base estimate</span><strong>${esc(formatMoneyRange(range))}</strong></div>
-                <div><span>Suggested tip</span><strong>$${totalTip.toLocaleString()}</strong><small>$${perMover.toLocaleString()} ea.</small></div>
-                <div><span>All-in planning total</span><strong>${esc(formatMoneyRange(totalRange))}</strong></div>
-              </div>
-              <div class="mt-mover-details">
-                <p><strong>Pricing:</strong> ${esc(m.pricingModel || m.price || 'Quote required')}</p>
-                <p><strong>Best for:</strong> ${esc(m.bestFor || 'Compare against your written quotes.')}</p>
-                <p><strong>Watch:</strong> ${esc(m.watchFor || 'Confirm access, materials, COI, stairs, and timing in writing.')}</p>
-                <p><strong>Rating note:</strong> ${esc(m.ratingNote || 'Check live reviews before booking.')}</p>
-              </div>
-              <div class="mt-mover-links">
-                ${m.website ? `<a href="${esc(m.website)}" target="_blank" rel="noopener noreferrer">Site</a>` : ''}
-                ${m.quoteUrl ? `<a href="${esc(m.quoteUrl)}" target="_blank" rel="noopener noreferrer">Quote</a>` : ''}
-                ${m.reviewUrl ? `<a href="${esc(m.reviewUrl)}" target="_blank" rel="noopener noreferrer">Reviews</a>` : ''}
-              </div>
-            </div>
-          `; }).join('')}
-        </div>
-      </div>
-    </div>
-
-    <div class="mt-card">
-      <div class="mt-card-header"><h3>Your mover quotes</h3></div>
-      <div class="mt-card-body">
-        <div class="mt-apt-form" style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px; padding: 10px 0;">
-          <input type="text" id="mover-name" placeholder="Company name" style="width:100%; box-sizing:border-box;" />
-          <input type="text" id="mover-phone" placeholder="Phone" style="width:100%; box-sizing:border-box;" />
-          <input type="number" id="mover-quote" placeholder="Quoted move cost before tip ($)" style="width:100%; box-sizing:border-box;" />
-          <input type="text" id="mover-notes" placeholder="Notes (quote, reviews, COI, stairs, included materials, etc.)" style="width:100%; box-sizing:border-box;" />
-          <button class="mt-wizard-btn" id="mover-add-btn" style="width:100%;">Add Mover</button>
-        </div>
-        ${state.customMovers.length === 0
-          ? '<p style="color:var(--text-muted); font-size:13px; text-align:center; padding:10px 0;">Add any other movers you\'re getting quotes from.</p>'
-          : `<div class="mt-mover-grid">
-              ${state.customMovers.map((m, i) => `
-                <div class="mt-mover">
-                  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <h4>${esc(m.name)}</h4>
-                    <span data-remove-mover="${i}" style="cursor:pointer; color:var(--text-muted); font-size:16px; padding:0 4px;">✕</span>
-                  </div>
-                  ${m.phone ? `<p style="color:var(--accent-primary); font-weight:600; font-family:monospace; margin:4px 0;">${esc(m.phone)}</p>` : ''}
-                  ${m.quoteAmount ? `
-                    <div class="mt-mover-cost-grid">
-                      <div><span>Your quote</span><strong>$${parseFloat(m.quoteAmount).toLocaleString()}</strong></div>
-                      <div><span>Suggested tip</span><strong>$${totalTip.toLocaleString()}</strong><small>$${perMover.toLocaleString()} ea.</small></div>
-                      <div><span>All-in planning total</span><strong>$${(parseFloat(m.quoteAmount) + totalTip).toLocaleString()}</strong></div>
-                    </div>
-                  ` : ''}
-                  ${m.notes ? `<p>${esc(m.notes)}</p>` : ''}
-                </div>
-              `).join('')}
-            </div>`
-        }
-      </div>
-    </div>
-  `;
+  return window.MovingMovers.renderMovers(moversCtx());
 }
 
 const ROOM_ICONS = { 'Kitchen': '🍳', 'Bedroom': '🛏️', 'Bathroom': '🚿', 'Closet': '👕', 'Living Room': '🛋️', 'Entryway/Storage': '📦' };
@@ -1009,6 +1035,64 @@ function renderDonationSuggestions() {
             </div>
           </div>
         `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderInstalledItemReminders() {
+  const reminders = AppEngine.INSTALLED_ITEM_REMINDERS || [];
+  if (!reminders.length) return '';
+  return `
+    <div class="mt-card mt-installed-card">
+      <div class="mt-card-header">
+        <div>
+          <h3>Installed things to take back</h3>
+          <p class="mt-muted-copy" style="margin:4px 0 0;">Upgrades you bought can be easy to forget because they feel like part of the apartment.</p>
+        </div>
+      </div>
+      <div class="mt-installed-grid">
+        ${reminders.map((item, i) => {
+          const key = `installed-${i}`;
+          const isDone = !!state.checked[key];
+          return `
+            <label class="mt-installed-item ${isDone ? 'done' : ''}">
+              <input type="checkbox" class="mt-check" data-check="${key}" ${isDone ? 'checked' : ''} aria-label="${esc(item.title)}" />
+              <div>
+                <div class="mt-installed-title">${esc(item.title)} <span>${esc(item.timing)}</span></div>
+                <p>${esc(item.action)}</p>
+                <small>${esc(item.why)} ${item.room ? `Area: ${esc(item.room)}.` : ''}</small>
+              </div>
+            </label>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderBulkyDonationRules() {
+  const rules = AppEngine.BULKY_DONATION_RULES || [];
+  if (!rules.length) return '';
+  return `
+    <div class="mt-card mt-bulky-card">
+      <div class="mt-card-header">
+        <div>
+          <h3>Bulky item reality check</h3>
+          <p class="mt-muted-copy" style="margin:4px 0 0;">Bigger donations need a decision earlier because pickup windows and elevator logistics get annoying fast.</p>
+        </div>
+      </div>
+      <div class="mt-card-body">
+        ${rules.map((rule, i) => {
+          const key = `bulky-donation-${i}`;
+          const isDone = !!state.checked[key];
+          return `
+            <div class="mt-item ${isDone ? 'done' : ''}">
+              <input type="checkbox" class="mt-check" data-check="${key}" ${isDone ? 'checked' : ''} aria-label="${esc(rule)}" />
+              <div class="mt-item-text" data-check="${key}">${esc(rule)}</div>
+            </div>
+          `;
+        }).join('')}
       </div>
     </div>
   `;
@@ -1057,6 +1141,8 @@ function renderRooms() {
     <div class="mt-alert-box">
       <strong>Room flow:</strong> purge first, pack second, then use Box Inventory for the final box labels and contents.
     </div>
+    ${renderInstalledItemReminders()}
+    ${renderBulkyDonationRules()}
     ${renderDonationSuggestions()}
     <div class="mt-mover-grid" style="grid-template-columns: 1fr;">${cards}</div>
   `;
@@ -1150,166 +1236,8 @@ function renderAddressUtil() {
   `;
 }
 
-function suggestedBoxToBox(suggestion, indexOverride) {
-  const number = typeof indexOverride === 'number' ? indexOverride : ((state.boxes || []).length + 1);
-  return {
-    id: (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : 'box-' + Date.now() + '-' + Math.random().toString(16).slice(2),
-    label: suggestion.label || `Box ${number}`,
-    room: suggestion.room || 'Unassigned',
-    contents: Array.isArray(suggestion.contents) ? [...suggestion.contents] : [],
-    fragile: !!suggestion.fragile,
-    openFirst: !!suggestion.openFirst,
-    status: 'packed'
-  };
-}
-
-function getSuggestedBoxKey(suggestion) {
-  return `${(suggestion.label || '').toLowerCase()}|${(suggestion.room || '').toLowerCase()}`;
-}
-
-function renderBoxPlan() {
-  const plan = AppEngine.DEFAULT_BOX_PLAN || [];
-  const used = new Set((state.boxes || []).map(getSuggestedBoxKey));
-  return `
-    <div class="mt-card mt-box-plan-card">
-      <div class="mt-card-header">
-        <div>
-          <h3>Suggested packing order</h3>
-          <p class="mt-muted-copy" style="margin:4px 0 0;">Start with what you will not need for weeks. Kitchen daily-use boxes wait until later.</p>
-        </div>
-        <button class="mt-secondary-btn" id="mt-box-add-plan">Add all missing</button>
-      </div>
-      <div class="mt-box-plan-list">
-        ${plan.map((suggestion, i) => {
-          const alreadyUsed = used.has(getSuggestedBoxKey(suggestion));
-          return `
-            <div class="mt-box-plan-item ${alreadyUsed ? 'used' : ''}">
-              <div class="mt-box-plan-num">${i + 1}</div>
-              <div class="mt-box-plan-main">
-                <div class="mt-box-plan-title">
-                  <strong>${esc(suggestion.label)}</strong>
-                  <span>${esc(suggestion.room)}</span>
-                  ${suggestion.fragile ? '<em>Fragile</em>' : ''}
-                  ${suggestion.openFirst ? '<em>Open first</em>' : ''}
-                </div>
-                <p>${esc(suggestion.note || '')}</p>
-                <ul>${(suggestion.contents || []).map(item => `<li>${esc(item)}</li>`).join('')}</ul>
-              </div>
-              <button class="mt-mini-action" data-box-use-suggestion="${i}" ${alreadyUsed ? 'disabled' : ''}>${alreadyUsed ? 'Added' : 'Use'}</button>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  `;
-}
-
-function moveBoxBefore(dragId, dropId) {
-  if (!dragId || !dropId || dragId === dropId) return false;
-  const boxes = state.boxes || [];
-  const from = boxes.findIndex(b => b.id === dragId);
-  const to = boxes.findIndex(b => b.id === dropId);
-  if (from < 0 || to < 0) return false;
-  const [moved] = boxes.splice(from, 1);
-  boxes.splice(from < to ? to - 1 : to, 0, moved);
-  return true;
-}
-
 function renderBoxes() {
-  const query = (state.boxSearch || '').toLowerCase();
-  const filter = state.boxStatusFilter || 'all';
-  const allBoxes = state.boxes || [];
-  const boxes = allBoxes.filter(box => {
-    const haystack = [box.label, box.room, box.status, ...(box.contents || [])].join(' ').toLowerCase();
-    const matchesQuery = !query || haystack.includes(query);
-    const matchesFilter = filter === 'all'
-      || (filter === 'open-first' && box.openFirst)
-      || (filter === 'fragile' && box.fragile)
-      || box.status === filter;
-    return matchesQuery && matchesFilter;
-  });
-  const editingBox = allBoxes.find(b => b.id === state.editingBoxId);
-  const roomOptions = ['Unassigned', ...AppEngine.ROOMS].map(room => `<option value="${esc(room)}" ${(editingBox?.room || '') === room ? 'selected' : ''}>${esc(room)}</option>`).join('');
-  const nextNum = allBoxes.length + 1;
-  const statusLabel = { packed: 'Packed', loaded: 'Loaded', arrived: 'Arrived', unpacked: 'Unpacked' };
-  const counts = {
-    all: allBoxes.length,
-    'open-first': allBoxes.filter(b => b.openFirst).length,
-    fragile: allBoxes.filter(b => b.fragile).length,
-    packed: allBoxes.filter(b => b.status === 'packed').length,
-    loaded: allBoxes.filter(b => b.status === 'loaded').length,
-    arrived: allBoxes.filter(b => b.status === 'arrived').length,
-    unpacked: allBoxes.filter(b => b.status === 'unpacked').length
-  };
-  const filterLabels = [
-    ['all', 'All'],
-    ['open-first', 'Open first'],
-    ['fragile', 'Fragile'],
-    ['packed', 'Packed'],
-    ['loaded', 'Loaded'],
-    ['arrived', 'Arrived'],
-    ['unpacked', 'Unpacked']
-  ];
-
-  return `
-    <div class="mt-alert-box">
-      <strong>Packing order:</strong> Box 1 should be off-season closet stuff, not daily kitchen gear. Kitchen basics and open-first boxes belong much closer to move week.
-    </div>
-    <div class="mt-dashboard-metrics" style="margin-bottom:16px;">
-      <div class="mt-card" style="padding:16px; margin:0; text-align:center;"><div class="mt-box-big">${allBoxes.length}</div><div class="mt-metric-label">Total boxes</div></div>
-      <div class="mt-card" style="padding:16px; margin:0; text-align:center;"><div class="mt-box-big">${counts['open-first']}</div><div class="mt-metric-label">Open first</div></div>
-      <div class="mt-card" style="padding:16px; margin:0; text-align:center;"><div class="mt-box-big">${counts.fragile}</div><div class="mt-metric-label">Fragile</div></div>
-      <div class="mt-card" style="padding:16px; margin:0; text-align:center;"><div class="mt-box-big">${counts.unpacked}</div><div class="mt-metric-label">Unpacked</div></div>
-    </div>
-    ${renderBoxPlan()}
-    <div class="mt-card">
-      <div class="mt-card-header"><h3>${editingBox ? `Edit ${esc(editingBox.label)}` : 'Add a box'}</h3></div>
-      <div class="mt-card-body" style="padding:16px 20px;">
-        <div class="mt-box-form">
-          <input type="text" id="mt-box-label" placeholder="Box ${nextNum}" value="${esc(editingBox?.label || '')}" />
-          <select id="mt-box-room">${roomOptions}</select>
-          <input type="text" id="mt-box-contents" placeholder="Contents, comma separated" value="${esc((editingBox?.contents || []).join(', '))}" />
-          <label class="mt-box-check"><input type="checkbox" id="mt-box-fragile" ${editingBox?.fragile ? 'checked' : ''} /> Fragile</label>
-          <label class="mt-box-check"><input type="checkbox" id="mt-box-open-first" ${editingBox?.openFirst ? 'checked' : ''} /> Open first</label>
-          <button class="mt-wizard-btn" id="mt-box-add">${editingBox ? 'Update Box' : 'Add Box'}</button>
-          ${editingBox ? '<button class="mt-secondary-btn" id="mt-box-cancel-edit">Cancel edit</button>' : ''}
-        </div>
-      </div>
-    </div>
-    <div class="mt-income-wrapper">
-      <label>Search boxes</label>
-      <input type="search" id="mt-box-search" value="${esc(state.boxSearch || '')}" placeholder="Try: mugs, router, towels, Kitchen..." />
-    </div>
-    <div class="mt-chip-row" style="margin: 0 0 16px 0;">
-      ${filterLabels.map(([value, label]) => `<button class="mt-filter-chip ${filter === value ? 'active' : ''}" data-box-filter="${value}">${label} (${counts[value] || 0})</button>`).join('')}
-    </div>
-    <div class="mt-box-grid">
-      ${boxes.length ? boxes.map(box => `
-        <div class="mt-box-card ${box.openFirst ? 'open-first' : ''}" draggable="true" data-box-drag-id="${esc(box.id)}">
-          <div class="mt-box-card-head">
-            <div>
-              <h4><span class="mt-drag-handle" aria-hidden="true">⋮⋮</span>${esc(box.label)}</h4>
-              <span>${esc(box.room || 'Unassigned')}</span>
-            </div>
-            <div class="mt-box-actions">
-              <button data-box-edit="${esc(box.id)}" aria-label="Edit ${esc(box.label)}">✎</button>
-              <button data-box-remove="${esc(box.id)}" aria-label="Remove ${esc(box.label)}">×</button>
-            </div>
-          </div>
-          <div class="mt-box-tags">
-            ${box.fragile ? '<span>Fragile</span>' : ''}
-            ${box.openFirst ? '<span>Open first</span>' : ''}
-          </div>
-          <ul>
-            ${(box.contents || []).length ? box.contents.map(item => `<li>${esc(item)}</li>`).join('') : '<li class="mt-empty">No contents listed yet.</li>'}
-          </ul>
-          <select data-box-status="${esc(box.id)}">
-            ${Object.keys(statusLabel).map(val => `<option value="${val}" ${box.status === val ? 'selected' : ''}>${statusLabel[val]}</option>`).join('')}
-          </select>
-        </div>
-      `).join('') : '<div class="mt-empty">No boxes match that view yet.</div>'}
-    </div>
-  `;
+  return window.MovingBoxes.renderBoxes(boxesCtx());
 }
 
 function renderDayOf() {
@@ -1389,6 +1317,7 @@ function render() {
     bindSetupForm(root);
     return;
   }
+  ensureVisibleActiveTab();
 
   let body = '';
   if (state.activeTab === 'dashboard') body = renderDashboard();
@@ -1454,7 +1383,19 @@ function attachHandlers() {
       reader.onload = () => {
         try {
           const parsed = JSON.parse(reader.result);
-          if (!confirm('This will replace your current data with the backup file. Continue?')) return;
+          const summary = AppEngine.getBackupSummary(parsed);
+          if (!summary) {
+            alert('That JSON file does not look like a Moving Assistant backup.');
+            return;
+          }
+          const message = [
+            `Import backup for ${summary.userName}?`,
+            `Move date: ${summary.targetMoveDate}`,
+            `Apartments: ${summary.apartments} · Boxes: ${summary.boxes} · Checked items: ${summary.checkedItems}`,
+            '',
+            'This will replace your current data. Continue?'
+          ].join('\n');
+          if (!confirm(message)) return;
           state = AppEngine.sanitizeState(parsed);
           AppEngine.saveState(state);
           render();
@@ -1578,16 +1519,6 @@ function attachHandlers() {
     notesEl.addEventListener('input', () => { state.notes = notesEl.value; AppEngine.saveState(state); });
   }
 
-  root.querySelectorAll('[data-tip-field]').forEach(input => {
-    input.addEventListener('change', () => {
-      if (!state.moverTip) state.moverTip = { crewSize: 3, hours: 4, rate: 8, service: 'good' };
-      const field = input.getAttribute('data-tip-field');
-      state.moverTip[field] = field === 'service' ? input.value : (parseFloat(input.value) || 0);
-      AppEngine.saveState(state);
-      render();
-    });
-  });
-
   root.querySelectorAll('[data-savings-field]').forEach(input => {
     input.addEventListener('input', () => {
       if (!state.savings) state.savings = { depositAmount: '', moverHourlyRate: '', avoidedMoverHours: '1', reusedBoxes: '', avoidedDuplicateBuys: '' };
@@ -1598,178 +1529,8 @@ function attachHandlers() {
   });
 
   window.MovingApartments.attachHandlers(apartmentCtx(root));
-
-  const boxSearch = root.querySelector('#mt-box-search');
-  if (boxSearch) {
-    boxSearch.addEventListener('input', () => {
-      state.boxSearch = boxSearch.value;
-      AppEngine.saveState(state);
-    });
-    boxSearch.addEventListener('keydown', (e) => { if (e.key === 'Enter') render(); });
-    boxSearch.addEventListener('blur', () => render());
-  }
-
-  root.querySelectorAll('[data-box-use-suggestion]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.getAttribute('data-box-use-suggestion'), 10);
-      const suggestion = (AppEngine.DEFAULT_BOX_PLAN || [])[idx];
-      if (!suggestion) return;
-      if (!state.boxes) state.boxes = [];
-      state.boxes.push(suggestedBoxToBox(suggestion));
-      AppEngine.saveState(state);
-      render();
-    });
-  });
-
-  const addPlanBtn = root.querySelector('#mt-box-add-plan');
-  if (addPlanBtn) {
-    addPlanBtn.addEventListener('click', () => {
-      if (!state.boxes) state.boxes = [];
-      const used = new Set(state.boxes.map(getSuggestedBoxKey));
-      (AppEngine.DEFAULT_BOX_PLAN || []).forEach((suggestion, idx) => {
-        if (!used.has(getSuggestedBoxKey(suggestion))) {
-          state.boxes.push(suggestedBoxToBox(suggestion, idx + 1));
-          used.add(getSuggestedBoxKey(suggestion));
-        }
-      });
-      AppEngine.saveState(state);
-      render();
-    });
-  }
-
-  const boxAddBtn = root.querySelector('#mt-box-add');
-  if (boxAddBtn) {
-    boxAddBtn.addEventListener('click', () => {
-      const labelEl = root.querySelector('#mt-box-label');
-      const roomEl = root.querySelector('#mt-box-room');
-      const contentsEl = root.querySelector('#mt-box-contents');
-      const fragileEl = root.querySelector('#mt-box-fragile');
-      const openFirstEl = root.querySelector('#mt-box-open-first');
-      const contents = (contentsEl.value || '').split(',').map(x => x.trim()).filter(Boolean);
-      const label = labelEl.value.trim() || `Box ${(state.boxes || []).length + 1}`;
-      if (!state.boxes) state.boxes = [];
-      const duplicate = state.boxes.find(b => b.label.toLowerCase() === label.toLowerCase() && b.id !== state.editingBoxId);
-      if (duplicate && !confirm(`${label} already exists. Add/update anyway?`)) return;
-      const existing = state.boxes.find(b => b.id === state.editingBoxId);
-      if (existing) {
-        existing.label = label;
-        existing.room = roomEl.value || 'Unassigned';
-        existing.contents = contents;
-        existing.fragile = !!fragileEl.checked;
-        existing.openFirst = !!openFirstEl.checked;
-        state.editingBoxId = '';
-      } else {
-        const beforePct = getPctDone();
-        state.boxes.push({
-          id: (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : 'box-' + Date.now(),
-          label,
-          room: roomEl.value || 'Unassigned',
-          contents,
-          fragile: !!fragileEl.checked,
-          openFirst: !!openFirstEl.checked,
-          status: 'packed'
-        });
-        if (state.boxes.length === 1) celebrateOnce('first-box', false);
-        maybeCelebrateProgress(beforePct);
-      }
-      AppEngine.saveState(state);
-      render();
-    });
-  }
-
-  const boxCancelEdit = root.querySelector('#mt-box-cancel-edit');
-  if (boxCancelEdit) {
-    boxCancelEdit.addEventListener('click', () => {
-      state.editingBoxId = '';
-      AppEngine.saveState(state);
-      render();
-    });
-  }
-
-  root.querySelectorAll('[data-box-filter]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      state.boxStatusFilter = btn.getAttribute('data-box-filter') || 'all';
-      AppEngine.saveState(state);
-      render();
-    });
-  });
-
-  root.querySelectorAll('[data-box-edit]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      state.editingBoxId = btn.getAttribute('data-box-edit');
-      AppEngine.saveState(state);
-      render();
-    });
-  });
-
-  root.querySelectorAll('[data-box-status]').forEach(sel => {
-    sel.addEventListener('change', () => {
-      const id = sel.getAttribute('data-box-status');
-      const box = (state.boxes || []).find(b => b.id === id);
-      if (!box) return;
-      box.status = sel.value;
-      AppEngine.saveState(state);
-      render();
-    });
-  });
-
-  root.querySelectorAll('[data-box-remove]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.getAttribute('data-box-remove');
-      if (!confirm('Remove this box from the inventory?')) return;
-      state.boxes = (state.boxes || []).filter(b => b.id !== id);
-      AppEngine.saveState(state);
-      render();
-    });
-  }); 
-
-  root.querySelectorAll('[data-box-drag-id]').forEach(card => {
-    card.addEventListener('dragstart', (e) => {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', card.getAttribute('data-box-drag-id'));
-      card.classList.add('dragging');
-    });
-    card.addEventListener('dragend', () => card.classList.remove('dragging'));
-    card.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      card.classList.add('drag-over');
-    });
-    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
-    card.addEventListener('drop', (e) => {
-      e.preventDefault();
-      card.classList.remove('drag-over');
-      const dragId = e.dataTransfer.getData('text/plain');
-      const dropId = card.getAttribute('data-box-drag-id');
-      if (moveBoxBefore(dragId, dropId)) {
-        AppEngine.saveState(state);
-        render();
-      }
-    });
-  });
-
-  const moverAddBtn = root.querySelector('#mover-add-btn');
-  if (moverAddBtn) {
-    moverAddBtn.addEventListener('click', () => {
-      const name = root.querySelector('#mover-name').value.trim();
-      const phone = root.querySelector('#mover-phone').value.trim();
-      const quoteAmount = root.querySelector('#mover-quote').value;
-      const notes = root.querySelector('#mover-notes').value.trim();
-      if (!name) return alert('Company name is required.');
-      state.customMovers.push({ name, phone, quoteAmount, notes });
-      AppEngine.saveState(state);
-      render();
-    });
-  }
-
-  root.querySelectorAll('[data-remove-mover]').forEach(el => {
-    el.addEventListener('click', () => {
-      const idx = parseInt(el.getAttribute('data-remove-mover'), 10);
-      if (!confirm('Remove this custom mover from your comparison grid?')) return;
-      state.customMovers.splice(idx, 1);
-      AppEngine.saveState(state);
-      render();
-    });
-  });
+  window.MovingBoxes.attachHandlers(boxesCtx(root));
+  window.MovingMovers.attachHandlers(moversCtx(root));
 
 }
 

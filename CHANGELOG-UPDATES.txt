@@ -1,5 +1,22 @@
 Moving Assistant — Product Update Changelog
 
+2026-07-08
+- Added first Move Profile fields for city/market, apartment hunt needed, move help, move distance, and building type.
+- Added first applicability behavior: apartment-hunt tools/focus hide when not needed, Movers hides for DIY moves, and hidden active tabs redirect to Dashboard.
+- Improved Dashboard hierarchy with a primary `Do next` action, secondary `Up next` list, compact status signal cards, and better mobile stacking.
+- Extracted Movers rendering, shared tip calculation, and mover/tip event handling into `src/js/movers.js`.
+- Added `movers.js` to the app script order, service-worker cache, and JavaScript smoke checks.
+- Extracted Box Inventory rendering and event handling into `src/js/boxes.js`, reducing the main app shell and matching the apartment module pattern.
+- Added `boxes.js` to the app script order, service-worker cache, and JavaScript smoke checks.
+- Added a dependency-free Node test harness with smoke checks for script syntax, cached assets, tab config, state migration, and backup summaries.
+- Made JSON backup import safer by rejecting unrelated JSON and showing a move summary before replacing saved data.
+- Centralized valid tab IDs in state so navigation and saved-state migration are easier to keep aligned.
+- Split apartment hunt/tracker code into its own module so the app is easier to grow.
+- Expanded apartment hunting with readiness checklists, listing status tracking, follow-up dates, cashier-check reminders, and search-site guidance.
+- Added mover comparison estimates with review links, quote tracking, and all-in totals including suggested tip.
+- Improved donation/packing guidance with installed-item reminders, bulky-item donation rules, and checkable donation prompts.
+- Hardened local saved-state migration so deployed updates are less likely to lose data on the same browser/site.
+
 Second implementation pass
 - Added editable city/market and neighborhood chips to Apartment Hunt so the app is less hardcoded to one NYC move.
 - Turned Apartment Hunter guide cards into real checkable action items that count toward progress.

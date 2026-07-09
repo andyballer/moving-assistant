@@ -1,6 +1,7 @@
 window.MovingApp = window.MovingApp || {};
 
 window.MovingApp.APT_STATUSES = ['Saved', 'Inquired', 'Heard Back', 'Needs Follow-up', 'Viewing Scheduled', 'Viewed', 'Applied', 'Rejected', 'Lease Signed'];
+window.MovingApp.TAB_IDS = ['dashboard', 'savings', 'aptsearch', 'apartments', 'tasks', 'supplies', 'rooms', 'boxes', 'movers', 'addressutil', 'dayof'];
 window.MovingApp.STORAGE_KEY = 'move-tracker:state:v8';
 window.MovingApp.STORAGE_BACKUP_KEY = 'move-tracker:state:latest';
 window.MovingApp.LEGACY_STORAGE_KEYS = [
@@ -23,9 +24,63 @@ window.MovingApp.DONATION_GUIDE = {
   'Bedroom': ['Extra bedding sets you do not love', 'Decor pillows you only move from chair to bed', 'Lamps or decor that will not fit the next place', 'Old sheets or towels for textile recycling'],
   'Bathroom': ['Unopened toiletries you will not use', 'Duplicate hair tools', 'Expired products or medications for proper disposal', 'Towels that should become packing padding or textile recycling'],
   'Closet': ['Clothes not worn in the last year', 'Shoes that hurt or need repairs you will not make', 'Bags, belts, and accessories that no longer fit your style', 'Freebie totes and duplicate hangers'],
-  'Living Room': ['Books you will not reread', 'Games with missing pieces', 'Extra cables and chargers you cannot identify', 'Decor that does not match the next apartment'],
+  'Living Room': ['Books you will not reread', 'Games with missing pieces', 'Old Xbox One / game console you decided to donate', 'Extra cables and chargers you cannot identify', 'Decor that does not match the next apartment'],
   'Entryway/Storage': ['Old boxes and mystery storage', 'Unused sports gear', 'Expired documents for shredding', 'Duplicate tools or hardware']
 };
+
+window.MovingApp.INSTALLED_ITEM_REMINDERS = [
+  {
+    title: 'Smart bulbs and specialty bulbs',
+    room: 'Whole apartment',
+    timing: '1-2 weeks before move day',
+    action: 'Buy cheap standard bulbs, swap them in, test each fixture, then pack your smart/expensive bulbs in a labeled fragile box.',
+    why: 'Fixtures usually need working bulbs left behind, but the upgraded bulbs are yours if you installed them.'
+  },
+  {
+    title: 'Shower head',
+    room: 'Bathroom',
+    timing: 'Move week',
+    action: 'Reinstall the old shower head if you still have it, check for leaks, then pack the upgraded shower head with plumber tape.',
+    why: 'Landlords generally expect a working shower fixture; your upgraded one can move with you.'
+  },
+  {
+    title: 'Router, mesh nodes, hubs, and smart bridges',
+    room: 'Living Room',
+    timing: 'Move day morning',
+    action: 'Label each power adapter, remove smart-home hubs, and only leave ISP-owned equipment if it belongs to the building/provider.',
+    why: 'Tiny hubs and adapters are easy to abandon accidentally, and replacing them is irritating.'
+  },
+  {
+    title: 'Command hooks, adhesive mounts, and removable shelves',
+    room: 'Bedroom / Entry',
+    timing: 'Final week',
+    action: 'Remove slowly, patch only what the lease allows, and decide whether cheap adhesive pieces are worth moving.',
+    why: 'This is a deposit-protection task more than a packing task.'
+  },
+  {
+    title: 'Window AC brackets, filters, and add-ons',
+    room: 'Living Room / Bedroom',
+    timing: '1-2 weeks before move day',
+    action: 'Confirm what must stay with the unit, remove personal add-ons, clean filters, and photograph the window area after removal.',
+    why: 'Window hardware can blur the line between yours and the apartment, so document it.'
+  },
+  {
+    title: 'Battery chargers, wall plates, and specialty adapters',
+    room: 'Whole apartment',
+    timing: 'Packing week',
+    action: 'Walk every outlet and shelf for chargers, smart plugs, dimmers, remotes, and adapters before the final box closes.',
+    why: 'Small installed tech is exactly the stuff that gets missed in the last sweep.'
+  }
+];
+
+window.MovingApp.BULKY_DONATION_RULES = [
+  'If you have not used it in a year and it is large, schedule donation or resale before the final two weeks.',
+  'If movers would spend more time carrying it than the item is worth, donate/sell it before move week.',
+  'If it is cheap to rebuy, awkward to carry, or unlikely to fit the next layout, let it go early.',
+  'For bulky items, book pickup as soon as you decide; donation pickup slots disappear quickly near month-end.',
+  'Take photos, measurements, elevator/stair notes, and pickup availability before posting furniture or electronics.',
+  'If an item needs repairs you have avoided for months, do not pay movers to relocate the unfinished project.'
+];
 
 // Curated per-room packing guide. Items are ordered most -> least important/complex.
 // action tags: 'bring' | 'buy-new' | 'donate' | 'optional' (drives the little colored pill in the UI)
@@ -39,7 +94,7 @@ window.MovingApp.ROOM_PACKING_GUIDE = {
     { item: 'Trash can & cleaning supplies', tip: 'Bring cleaning supplies in an "open first" box — you\'ll want them to clean both the old and new place.', action: 'optional' }
   ],
   'Bathroom': [
-    { item: 'Shower head', tip: 'Unscrew and bring pliers for corroded fittings — landlords usually only leave a basic builder-grade one behind.', action: 'bring' },
+    { item: 'Shower head', tip: 'If you installed an upgraded shower head, reinstall the old one first, check for leaks, then pack yours with plumber tape.', action: 'bring' },
     { item: 'Shower curtain & rings', tip: 'No box needed — just roll it up and pack it in a bag with towels.', action: 'bring' },
     { item: 'Medicine cabinet & toiletries', tip: 'Use a toiletry bag or ziplock bags for anything liquid, tape lids shut, and pack upright in a small box.', action: 'bring' },
     { item: 'Towels & bath mat', tip: 'Use these as free padding for fragile kitchen items instead of buying extra packing paper.', action: 'bring' },
@@ -62,6 +117,7 @@ window.MovingApp.ROOM_PACKING_GUIDE = {
   ],
   'Living Room': [
     { item: 'TV & electronics', tip: 'Snap a photo of the cable setup before disconnecting anything. Bundle and label cables with painter\'s tape.', action: 'bring' },
+    { item: 'Smart bulbs, hubs & upgraded tech', tip: 'Swap in cheap standard bulbs before move day so you can take expensive smart bulbs, hubs, and specialty adapters with you.', action: 'bring' },
     { item: 'Bookshelves & books', tip: 'Books are deceptively heavy — always use small boxes for them, never large ones, so you can actually lift the box.', action: 'bring' },
     { item: 'Furniture (couch, coffee table, chairs)', tip: 'Disassemble legs where possible, and measure doorways ahead of time to confirm the couch will actually fit through.', action: 'bring' },
     { item: 'Rugs', tip: 'Roll — don\'t fold — and secure with tape or stretch wrap.', action: 'bring' },
@@ -445,6 +501,14 @@ window.MovingApp.defaultState = function() {
     userName: '',
     targetMoveDate: '',
     aptSize: '1br',
+    moveProfile: {
+      market: 'nyc',
+      distance: 'local',
+      housing: 'renter',
+      apartmentHunt: true,
+      moveStyle: 'movers',
+      buildingType: 'apartment'
+    },
     city: '',
     neighborhoods: [...window.MovingApp.DEFAULT_NEIGHBORHOODS],
     targetBudgetMin: '',
@@ -514,6 +578,15 @@ window.MovingApp.sanitizeState = function(input) {
   merged.userName = typeof input.userName === 'string' ? input.userName : '';
   merged.targetMoveDate = typeof input.targetMoveDate === 'string' ? input.targetMoveDate : '';
   merged.aptSize = ['studio', '1br', '2br', '3br'].includes(input.aptSize) ? input.aptSize : '1br';
+  const profile = input.moveProfile && typeof input.moveProfile === 'object' && !Array.isArray(input.moveProfile) ? input.moveProfile : {};
+  merged.moveProfile = {
+    market: ['nyc', 'other'].includes(profile.market) ? profile.market : 'nyc',
+    distance: ['local', 'long-distance'].includes(profile.distance) ? profile.distance : 'local',
+    housing: ['renter', 'owner'].includes(profile.housing) ? profile.housing : 'renter',
+    apartmentHunt: typeof profile.apartmentHunt === 'boolean' ? profile.apartmentHunt : true,
+    moveStyle: ['movers', 'diy'].includes(profile.moveStyle) ? profile.moveStyle : 'movers',
+    buildingType: ['apartment', 'house'].includes(profile.buildingType) ? profile.buildingType : 'apartment'
+  };
   merged.city = typeof input.city === 'string' ? input.city : '';
   merged.neighborhoods = Array.isArray(input.neighborhoods)
     ? input.neighborhoods.map(String).map(x => x.trim()).filter(Boolean).slice(0, 12)
@@ -595,10 +668,45 @@ window.MovingApp.sanitizeState = function(input) {
   merged.backupExportedAt = typeof input.backupExportedAt === 'string' ? input.backupExportedAt : '';
   merged.celebrationLog = (input.celebrationLog && typeof input.celebrationLog === 'object' && !Array.isArray(input.celebrationLog)) ? input.celebrationLog : {};
   merged.notes = typeof input.notes === 'string' ? input.notes : '';
-  const validTabs = ['dashboard', 'savings', 'aptsearch', 'apartments', 'tasks', 'supplies', 'boxes', 'movers', 'rooms', 'addressutil', 'dayof'];
-  merged.activeTab = input.activeTab === 'donations' ? 'rooms' : (validTabs.includes(input.activeTab) ? input.activeTab : 'dashboard');
+  merged.activeTab = input.activeTab === 'donations' ? 'rooms' : (window.MovingApp.TAB_IDS.includes(input.activeTab) ? input.activeTab : 'dashboard');
   merged.showWizardOverride = !!input.showWizardOverride;
   return merged;
+};
+
+window.MovingApp.isLikelyBackupPayload = function(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return false;
+  const knownKeys = [
+    'schemaVersion',
+    'userName',
+    'targetMoveDate',
+    'aptSize',
+    'checked',
+    'apartments',
+    'boxes',
+    'rooms',
+    'utilities',
+    'contacts',
+    'notes'
+  ];
+  return knownKeys.some(key => Object.prototype.hasOwnProperty.call(input, key));
+};
+
+window.MovingApp.getBackupSummary = function(input) {
+  if (!window.MovingApp.isLikelyBackupPayload(input)) return null;
+  const sanitized = window.MovingApp.sanitizeState(input);
+  const checkedCount = Object.values(sanitized.checked || {}).filter(Boolean).length;
+  const packedRooms = Object.values(sanitized.rooms || {}).filter(value => value === 'Packed').length;
+  return {
+    userName: sanitized.userName || 'Unnamed move',
+    targetMoveDate: sanitized.targetMoveDate || 'No move date',
+    aptSize: sanitized.aptSize,
+    apartments: sanitized.apartments.length,
+    boxes: sanitized.boxes.length,
+    checkedItems: checkedCount,
+    packedRooms,
+    utilitiesDone: Object.values(sanitized.utilities || {}).filter(rec => rec.status === 'done').length,
+    schemaVersion: sanitized.schemaVersion
+  };
 };
 
 window.MovingApp.storageKeys = function() {
