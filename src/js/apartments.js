@@ -3,6 +3,7 @@ window.MovingApartments = (function() {
     {
       name: 'StreetEasy',
       url: 'https://streeteasy.com/for-rent/nyc',
+      supportsFilters: true,
       bestFor: 'Main NYC search, building history, neighborhood filters, open houses, no-fee/base-rent comparisons.',
       timing: 'Check daily once you are inside 45 days; refresh saved searches morning, lunch, and late afternoon in the final 2 weeks.',
       tip: 'Save very specific searches by commute/neighborhood and cross-check the same building on Openigloo before touring.'
@@ -45,6 +46,7 @@ window.MovingApartments = (function() {
     {
       name: 'RentHop',
       url: 'https://www.renthop.com/nyc/apartments-for-rent',
+      supportsFilters: true,
       bestFor: 'Extra inventory checks, alerts, and neighborhood rent averages.',
       timing: 'Good secondary sweep after your StreetEasy/Openigloo pass.',
       tip: 'Treat duplicate listings as a signal to identify the real listing agent and fastest contact path.'
@@ -52,6 +54,7 @@ window.MovingApartments = (function() {
     {
       name: 'Zillow / Apartments.com / Realtor',
       url: 'https://www.zillow.com/new-york-ny/rentals/',
+      supportsFilters: true,
       bestFor: 'Broad aggregator coverage, especially outside the tightest Manhattan/Brooklyn core.',
       timing: 'Use for comparison, outer-borough options, Jersey City/Hoboken, and larger managed buildings.',
       tip: 'If the same unit appears on several sites, log only the cleanest source and add the others as extra links.'
@@ -66,11 +69,78 @@ window.MovingApartments = (function() {
     {
       name: 'Craigslist / Facebook groups',
       url: 'https://newyork.craigslist.org/search/apa',
+      supportsFilters: true,
       bestFor: 'Rooms, private-owner leads, oddball sublets, and last-minute backup options.',
       timing: 'Use carefully when the mainstream sites are too expensive or too slow.',
       tip: 'Never send money before verifying access, identity, lease authority, and the exact unit in person or by trusted live video.'
     }
   ];
+
+  const BEDROOM_COUNTS = { studio: 0, '1br': 1, '2br': 2, '3br': 3 };
+  function numberOrBlank(value) {
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : '';
+  }
+
+  function getBedroomCount(state) {
+    return BEDROOM_COUNTS[state.aptSize] ?? 1;
+  }
+
+  function buildSourceUrl(source, ctx) {
+    const { state } = ctx;
+    const minRent = numberOrBlank(state.targetBudgetMin);
+    const maxRent = numberOrBlank(state.targetBudgetMax);
+    const beds = getBedroomCount(state);
+    const firstNeighborhood = (state.neighborhoods || []).find(Boolean);
+
+    if (source.name === 'StreetEasy') {
+      const filters = [];
+      if (minRent || maxRent) filters.push(`price:${minRent || '0'}-${maxRent || ''}`);
+      if (beds === 0) filters.push('beds:0');
+      if (beds > 0) filters.push(`beds:${beds}`);
+      return filters.length ? `${source.url}/${filters.map(encodeURIComponent).join('|')}` : source.url;
+    }
+
+    if (source.name === 'RentHop') {
+      const url = new URL('https://www.renthop.com/search/nyc');
+      if (minRent) url.searchParams.set('min_price', minRent);
+      if (maxRent) url.searchParams.set('max_price', maxRent);
+      if (beds === 0) url.searchParams.set('bedrooms', '0');
+      if (beds > 0) url.searchParams.set('bedrooms', String(beds));
+      if (firstNeighborhood) url.searchParams.set('q', firstNeighborhood);
+      return url.toString();
+    }
+
+    if (source.name === 'Zillow / Apartments.com / Realtor') {
+      const url = new URL('https://www.zillow.com/new-york-ny/rentals/');
+      const query = ['New York', firstNeighborhood, `${beds === 0 ? 'studio' : `${beds} bedroom`}`, minRent && `from $${minRent}`, maxRent && `under $${maxRent}`]
+        .filter(Boolean)
+        .join(' ');
+      if (query) url.searchParams.set('searchQueryState', JSON.stringify({ usersSearchTerm: query }));
+      return url.toString();
+    }
+
+    if (source.name === 'Craigslist / Facebook groups') {
+      const url = new URL(source.url);
+      if (minRent) url.searchParams.set('min_price', minRent);
+      if (maxRent) url.searchParams.set('max_price', maxRent);
+      if (beds > 0) url.searchParams.set('min_bedrooms', String(beds));
+      if (firstNeighborhood) url.searchParams.set('query', firstNeighborhood);
+      return url.toString();
+    }
+
+    return source.url;
+  }
+
+  function getSearchSummary(state) {
+    const parts = [];
+    parts.push('NYC');
+    if (state.aptSize) parts.push(state.aptSize.toUpperCase());
+    if (state.targetBudgetMin || state.targetBudgetMax) {
+      parts.push(`$${state.targetBudgetMin || 'any'}-${state.targetBudgetMax || 'any'}`);
+    }
+    return parts.join(' · ');
+  }
 
   function guideFocusItem(ctx) {
     const { AppEngine, state } = ctx;
@@ -173,24 +243,31 @@ window.MovingApartments = (function() {
   }
 
   function renderSearchSources(ctx) {
-    const { esc } = ctx;
+    const { state, esc } = ctx;
+    const searchSummary = getSearchSummary(state);
     return `
       <div class="mt-card mt-source-card-wrap">
-        <div class="mt-card-header"><h3>Where to search</h3></div>
+        <div class="mt-card-header">
+          <h3>Where to search</h3>
+          ${searchSummary ? `<span class="date-range">${esc(searchSummary)}</span>` : ''}
+        </div>
         <div class="mt-card-body">
           <div class="mt-source-grid">
-            ${SEARCH_SOURCES.map(source => `
+            ${SEARCH_SOURCES.map(source => {
+              const url = source.url ? buildSourceUrl(source, ctx) : '';
+              return `
               <div class="mt-source-card">
                 <div class="mt-source-title">
-                  ${source.url
-                    ? `<a href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.name)}</a>`
+                  ${url
+                    ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(source.name)}</a>`
                     : `<span>${esc(source.name)}</span>`}
                 </div>
                 <p>${esc(source.bestFor)}</p>
+                ${source.supportsFilters && url ? `<div class="mt-source-meta"><strong>Link:</strong> prefilled from NYC, size, rent, and first neighborhood when supported.</div>` : ''}
                 <div class="mt-source-meta"><strong>When:</strong> ${esc(source.timing)}</div>
                 <div class="mt-source-meta"><strong>Tip:</strong> ${esc(source.tip)}</div>
               </div>
-            `).join('')}
+            `; }).join('')}
           </div>
         </div>
       </div>
@@ -251,7 +328,6 @@ window.MovingApartments = (function() {
         <div class="mt-card-header"><h3>Search setup</h3></div>
         <div class="mt-card-body">
           <div class="mt-two-col-form">
-            <label>City / market<input type="text" id="mt-city-input" placeholder="e.g. New York, Chicago, Austin" value="${esc(state.city || '')}" /></label>
             <label>Add neighborhood<input type="text" id="mt-neighborhood-input" placeholder="e.g. Park Slope" /></label>
           </div>
           <button class="mt-wizard-btn" id="mt-neighborhood-add" style="width:auto; padding:10px 14px; margin-top:8px;">Add neighborhood</button>
@@ -282,7 +358,7 @@ window.MovingApartments = (function() {
       </div>
       <div class="mt-card" style="margin: 0 0 16px 0; border-color: rgba(0,122,255,0.16); background: rgba(0,122,255,0.035);">
         <div class="mt-card-body" style="padding:14px 18px; font-size:13px; line-height:1.5;">
-          <strong>NYC note:</strong> the FARE Act changed broker-fee rules in 2025. If a landlord's broker tries to charge you, verify who they represent before paying anything. Keep this note editable/removable for non-NYC users.
+          <strong>NYC note:</strong> the FARE Act changed broker-fee rules in 2025. If a landlord's broker tries to charge you, verify who they represent before paying anything.
         </div>
       </div>
       ${renderPhaseList(AppEngine.APT_PHASES)}
@@ -540,14 +616,6 @@ window.MovingApartments = (function() {
 
   function attachHandlers(ctx) {
     const { root, state, AppEngine, render } = ctx;
-
-    const cityInput = root.querySelector('#mt-city-input');
-    if (cityInput) {
-      cityInput.addEventListener('blur', () => {
-        state.city = cityInput.value.trim();
-        AppEngine.saveState(state);
-      });
-    }
 
     const neighborhoodAdd = root.querySelector('#mt-neighborhood-add');
     if (neighborhoodAdd) {

@@ -1,6 +1,27 @@
 Moving Assistant — Product Update Changelog
 
 2026-07-08
+- Added first-week follow-up dates to the shared Dashboard deadline and calendar-export pipeline.
+- Moved remaining header/mobile-menu shell inline styles into CSS classes.
+- Extracted task timeline and move-guidance rendering into `src/js/tasks.js` while keeping timeline calculation shared in the app shell.
+- Extracted Supplies rendering into `src/js/supplies.js` while keeping behavior unchanged and moved its remaining inline copy styles into CSS classes.
+- Extracted Savings rendering and estimate calculation into `src/js/savings.js` while keeping behavior unchanged.
+- Moved repeated Savings metric and money-play inline styles into CSS classes.
+- Extracted Move Day rendering into `src/js/dayof.js` while keeping behavior unchanged.
+- Added a first-week follow-up checklist to Move Day for utilities, deposit-return proof, address updates, and new-place basics.
+- Added local `.ics` calendar export for tracked moving deadlines from the Dashboard.
+- Reduced fresh Dashboard inline styling by moving metric/fun-stat/deadline-action styles into CSS classes.
+- Grouped Dashboard deadline chips into `Today`, `This Week`, and `Later` lanes.
+- Extracted shared deadline calculation into `src/js/deadlines.js`, added it to the app shell/cache/checks, and kept dashboard deadline behavior covered.
+- Extracted Address & Utilities rendering into `src/js/utilities.js` while keeping behavior unchanged.
+- Extracted Room Packing rendering into `src/js/rooms.js` while keeping behavior unchanged.
+- Extracted Dashboard rendering into `src/js/dashboard.js` while keeping behavior unchanged.
+- Added a Dashboard deadlines panel that surfaces upcoming move day, mover/DIY confirmation, apartment, utility, and internet equipment-return dates from existing app data.
+- Added Internet/Cable cancellation and rented-equipment return guidance to Address & Utilities, including a Spectrum-friendly 2-3 week scheduling reminder and receipt-tracking checklist.
+- Added DIY-specific task and move-day guidance so hiding the Movers tab now replaces the mover workflow with rental/helper/loading advice.
+- Added building-type-specific timeline, task, and move-day guidance for apartment/building versus house/standalone moves.
+- Removed the orphaned move-distance profile field instead of adding a speculative long-distance setup question.
+- Removed the dead city/market and renter/owner profile fields so the app matches the NYC-only product scope.
 - Added first Move Profile fields for city/market, apartment hunt needed, move help, move distance, and building type.
 - Added first applicability behavior: apartment-hunt tools/focus hide when not needed, Movers hides for DIY moves, and hidden active tabs redirect to Dashboard.
 - Improved Dashboard hierarchy with a primary `Do next` action, secondary `Up next` list, compact status signal cards, and better mobile stacking.

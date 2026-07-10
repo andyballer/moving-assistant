@@ -35,6 +35,14 @@ function usesProfessionalMovers() {
   return getMoveProfile().moveStyle !== 'diy';
 }
 
+function isDiyMove() {
+  return !usesProfessionalMovers();
+}
+
+function isHouseMove() {
+  return getMoveProfile().buildingType === 'house';
+}
+
 function getVisibleAppSections() {
   return appSections.filter(sec => {
     if (sec.category === 'apartment' && !needsApartmentHunt()) return false;
@@ -75,28 +83,38 @@ function renderWelcomeSceneHtml(contentHtml) {
 
 function getSetupFormHtml() {
   const profile = getMoveProfile();
+  const showHuntFields = profile.apartmentHunt !== false;
   return `
     <h1>Moving Assistant</h1>
-    <p class="mt-welcome-subcopy">Tell me the basics and I’ll build the move plan around them.</p>
+    <p class="mt-welcome-subcopy">Answer only what changes your plan. I’ll use it right away.</p>
     <div class="mt-wizard-card mt-welcome-form">
       <div class="mt-wizard-field"><label>What should we call you?</label><input type="text" id="wiz-name" placeholder="e.g. Andy" value="${esc(state.userName || '')}" /></div>
       <div class="mt-wizard-field"><label>When's moving day?</label><input type="date" id="wiz-date" value="${state.targetMoveDate || ''}" /></div>
       <div class="mt-wizard-field">
         <label>How big's the place?</label>
         <select id="wiz-size">
-          <option value="studio" ${state.aptSize === 'studio' ? 'selected' : ''}>Studio Layout</option>
-          <option value="1br" ${state.aptSize === '1br' ? 'selected' : ''}>1-Bedroom Apartment</option>
-          <option value="2br" ${state.aptSize === '2br' ? 'selected' : ''}>2-Bedroom Apartment</option>
-          <option value="3br" ${state.aptSize === '3br' ? 'selected' : ''}>3-Bedroom Apartment</option>
+          <option value="studio" ${state.aptSize === 'studio' ? 'selected' : ''}>Studio</option>
+          <option value="1br" ${state.aptSize === '1br' ? 'selected' : ''}>1 bedroom</option>
+          <option value="2br" ${state.aptSize === '2br' ? 'selected' : ''}>2 bedrooms</option>
+          <option value="3br" ${state.aptSize === '3br' ? 'selected' : ''}>3 bedrooms</option>
         </select>
       </div>
-      <div class="mt-wizard-field"><label>City / market</label><input type="text" id="wiz-city" placeholder="e.g. New York, Chicago, Austin" value="${esc(state.city || '')}" /></div>
       <div class="mt-wizard-field">
         <label>Do you still need to find a place?</label>
         <select id="wiz-apartment-hunt">
           <option value="yes" ${profile.apartmentHunt !== false ? 'selected' : ''}>Yes, include apartment hunt tools</option>
           <option value="no" ${profile.apartmentHunt === false ? 'selected' : ''}>No, I already have the place</option>
         </select>
+      </div>
+      <div class="mt-setup-hunt-fields" ${showHuntFields ? '' : 'hidden'}>
+        <div class="mt-wizard-field">
+          <label>Target rent range</label>
+          <div class="mt-wizard-inline">
+            ${renderRentDropdownHtml('wiz-target-min-rent', 'Min rent', state.targetBudgetMin || '')}
+            <span>to</span>
+            ${renderRentDropdownHtml('wiz-target-max-rent', 'Max rent', state.targetBudgetMax || '')}
+          </div>
+        </div>
       </div>
       <div class="mt-wizard-field">
         <label>Move help</label>
@@ -105,15 +123,12 @@ function getSetupFormHtml() {
           <option value="diy" ${profile.moveStyle === 'diy' ? 'selected' : ''}>DIY / friends / rental vehicle</option>
         </select>
       </div>
-      <div class="mt-two-col-form mt-profile-grid">
-        <label>Move distance<select id="wiz-distance">
-          <option value="local" ${profile.distance !== 'long-distance' ? 'selected' : ''}>Local</option>
-          <option value="long-distance" ${profile.distance === 'long-distance' ? 'selected' : ''}>Long-distance</option>
-        </select></label>
-        <label>Home type<select id="wiz-building-type">
+      <div class="mt-wizard-field">
+        <label>Home type</label>
+        <select id="wiz-building-type">
           <option value="apartment" ${profile.buildingType !== 'house' ? 'selected' : ''}>Apartment / building</option>
           <option value="house" ${profile.buildingType === 'house' ? 'selected' : ''}>House / standalone</option>
-        </select></label>
+        </select>
       </div>
       <button class="mt-wizard-btn" id="wiz-submit">Build My Move Plan</button>
     </div>
@@ -121,27 +136,31 @@ function getSetupFormHtml() {
 }
 
 function bindSetupForm(root) {
+  const huntSelect = root.querySelector('#wiz-apartment-hunt');
+  const huntFields = root.querySelector('.mt-setup-hunt-fields');
+  if (huntSelect && huntFields) {
+    huntSelect.addEventListener('change', () => {
+      huntFields.hidden = huntSelect.value !== 'yes';
+    });
+  }
+
   const submit = root.querySelector('#wiz-submit');
   if (!submit) return;
   submit.addEventListener('click', () => {
     const name = root.querySelector('#wiz-name').value.trim();
     const date = root.querySelector('#wiz-date').value;
     const size = root.querySelector('#wiz-size').value;
-    const city = root.querySelector('#wiz-city').value.trim();
     const apartmentHunt = root.querySelector('#wiz-apartment-hunt').value === 'yes';
     const moveStyle = root.querySelector('#wiz-move-style').value;
-    const distance = root.querySelector('#wiz-distance').value;
     const buildingType = root.querySelector('#wiz-building-type').value;
     if (!name || !date) return alert('Just need your name and move date to get started!');
     state.userName = name;
     state.targetMoveDate = date;
     state.aptSize = size;
-    state.city = city;
+    state.targetBudgetMin = apartmentHunt ? root.querySelector('#wiz-target-min-rent').value : state.targetBudgetMin;
+    state.targetBudgetMax = apartmentHunt ? root.querySelector('#wiz-target-max-rent').value : state.targetBudgetMax;
     state.moveProfile = {
       ...(state.moveProfile || {}),
-      market: city && !/new york|nyc/i.test(city) ? 'other' : 'nyc',
-      distance,
-      housing: 'renter',
       apartmentHunt,
       moveStyle,
       buildingType
@@ -280,11 +299,11 @@ window.openMobileMenu = function() {
     </div>
     <div class="mt-mobile-menu-bottom">
       <div class="mt-progress-meta"><span>MOVE PROGRESS</span><span>${pct}% Done</span></div>
-      <div class="mt-progress-track" style="margin-bottom:15px;"><div class="mt-progress-fill" style="width:${pct}%"></div></div>
-      <button class="mt-wizard-btn" id="mobile-gear-trigger" style="margin-bottom: 10px; width: 100%;">⚙️ Edit Move Details</button>
-      <div style="display:flex; gap:10px;">
-         <button class="mt-wizard-btn" id="mobile-export-trigger" style="flex:1; background:#8e8e93;">Export JSON</button>
-         <button class="mt-wizard-btn" id="mobile-import-trigger" style="flex:1; background:#8e8e93;">Import JSON</button>
+      <div class="mt-progress-track mt-mobile-progress-track"><div class="mt-progress-fill" style="width:${pct}%"></div></div>
+      <button class="mt-wizard-btn mt-mobile-menu-wide-btn" id="mobile-gear-trigger">⚙️ Edit Move Details</button>
+      <div class="mt-mobile-menu-actions">
+         <button class="mt-wizard-btn mt-mobile-menu-secondary-btn" id="mobile-export-trigger">Export JSON</button>
+         <button class="mt-wizard-btn mt-mobile-menu-secondary-btn" id="mobile-import-trigger">Import JSON</button>
       </div>
     </div>
   `;
@@ -316,7 +335,7 @@ window.openMobileMenu = function() {
 
 // --- RENT BUDGET SELECT DROPDOWN REUSABLE HTML GENERATOR ---
 function renderRentDropdownHtml(elementId, placeholderText, activeValue) {
-  let html = `<select id="${elementId}" style="padding:10px; border:1px solid var(--border-color); border-radius:8px; font-size:13px; background:#fff; flex:1; min-width:120px;">`;
+  let html = `<select id="${elementId}" class="mt-rent-select">`;
   html += `<option value="">${placeholderText}</option>`;
   for (let rent = 2500; rent <= 5000; rent += 250) {
     html += `<option value="${rent}" ${activeValue == rent ? 'selected' : ''}>$${rent.toLocaleString()}</option>`;
@@ -341,6 +360,9 @@ function getKnownCheckKeys() {
   (AppEngine.SAVINGS_PLAYS || []).forEach((_, i) => keys.push('saving-' + i));
   (AppEngine.MOVE_DAY_STAGES || []).forEach(stage => {
     stage.items.forEach((_, i) => keys.push('dayof-' + stage.title.replace(/\W+/g, '-').toLowerCase() + '-' + i));
+  });
+  (AppEngine.FIRST_WEEK_STAGES || []).forEach(stage => {
+    stage.items.forEach((_, i) => keys.push('firstweek-' + stage.title.replace(/\W+/g, '-').toLowerCase() + '-' + i));
   });
   return keys;
 }
@@ -410,6 +432,16 @@ function getRoomFocusItem() {
 }
 
 function getUtilityFocusItem() {
+  const internet = state.utilities['Internet/Cable'] || {};
+  if ((daysUntilMove() <= 21 || internet.provider) && internet.status !== 'done') {
+    if (!internet.oldCancelDate) {
+      return { text: 'Internet/Cable: schedule cancellation or transfer', phase: 'Best timing: 2-3 weeks ahead', tab: 'addressutil', type: 'utility' };
+    }
+    if (!internet.confirmation || !internet.notes) {
+      return { text: 'Internet/Cable: note confirmation and equipment return plan', phase: 'Avoid surprise equipment fees', tab: 'addressutil', type: 'utility' };
+    }
+  }
+
   const missing = AppEngine.UTILITIES.find(u => {
     const rec = state.utilities[u] || {};
     return !rec.oldCancelDate || !rec.newStartDate;
@@ -417,6 +449,31 @@ function getUtilityFocusItem() {
   if (!missing) return null;
   const guide = AppEngine.UTILITY_GUIDE[missing];
   return { text: `${missing}: add provider/date details`, phase: guide ? `Best timing: ${guide.lead}` : 'Utility timing', tab: 'addressutil', type: 'utility' };
+}
+
+function deadlineCtx() {
+  return {
+    state,
+    AppEngine,
+    daysUntilDate,
+    getMoveDayOfWeek,
+    needsApartmentHunt,
+    isDiyMove
+  };
+}
+
+function getUpcomingDeadlines() {
+  return window.MovingDeadlines.getUpcomingDeadlines(deadlineCtx());
+}
+
+function downloadTextFile(filename, text, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function getBoxFocusItem() {
@@ -656,7 +713,7 @@ function renderHeader() {
         <button class="mt-hamburger-btn" onclick="window.openMobileMenu()">☰</button>
         <div>
           <h1>${sectionTitle}</h1>
-          <p>Target Date: <span style="font-size: 14px; color: var(--accent-primary); font-weight:700;">${formattedMoveDate} (${weekday})</span></p>
+          <p>Target Date: <span class="mt-target-date">${formattedMoveDate} (${weekday})</span></p>
         </div>
       </div>
       <div class="mt-countdown ${urgencyClass}">
@@ -679,7 +736,6 @@ function renderSidebar() {
   ].filter(group => group.sections.length);
   const profile = getMoveProfile();
   const profileLabel = [
-    profile.distance === 'long-distance' ? 'Long-distance' : 'Local',
     profile.moveStyle === 'diy' ? 'DIY move' : 'mover-assisted',
     state.aptSize.toUpperCase()
   ].join(' · ');
@@ -704,7 +760,7 @@ function renderSidebar() {
         <button class="mt-settings-trigger" id="mt-gear-settings">⚙️ Edit Move Details</button>
         <button class="mt-settings-trigger" id="mt-export-backup">⬇️ Export Backup</button>
         <button class="mt-settings-trigger" id="mt-import-backup">⬆️ Import Backup</button>
-        <input type="file" id="mt-import-file" accept="application/json" style="display:none;" />
+        <input type="file" id="mt-import-file" accept="application/json" class="mt-hidden-file-input" />
         <div class="mt-sidebar-progress">
           <div class="mt-progress-meta"><span>PROGRESS</span><span>${pct}% Done</span></div>
           <div class="mt-progress-track"><div class="mt-progress-fill" style="width:${pct}%"></div></div>
@@ -714,188 +770,39 @@ function renderSidebar() {
   `;
 }
 
+function dashboardCtx() {
+  return {
+    AppEngine,
+    state,
+    esc,
+    daysUntilMove,
+    totalTaskCount,
+    doneTaskCount,
+    getTodaysFocusItems,
+    needsApartmentHunt,
+    getApartmentActionItems,
+    estimateSavings,
+    getUpcomingDeadlines,
+    getGreeting,
+    renderFocusDoneButton,
+    getFunStat
+  };
+}
+
 function renderDashboard() {
-  const days = Math.max(0, daysUntilMove());
-  const total = totalTaskCount();
-  const done = doneTaskCount();
-  const pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
-  const focusItems = getTodaysFocusItems();
-  const apartmentActions = needsApartmentHunt() ? getApartmentActionItems() : [];
-  const packedRooms = AppEngine.ROOMS.filter(r => state.rooms[r] === 'Packed').length;
-  const boxCount = (state.boxes || []).length;
-  const openFirstCount = (state.boxes || []).filter(b => b.openFirst && b.status !== 'unpacked').length;
-  const utilitiesDone = AppEngine.UTILITIES.filter(u => (state.utilities[u] || {}).status === 'done').length;
-  const backupText = state.backupExportedAt ? `Last backup: ${new Date(state.backupExportedAt).toLocaleDateString()}` : 'No backup yet';
-  const savings = estimateSavings();
-  const primaryFocus = focusItems[0];
-  const secondaryFocus = focusItems.slice(1);
-  const signalCards = [
-    { label: 'Rooms packed', value: `${packedRooms}/${AppEngine.ROOMS.length}`, tab: 'rooms' },
-    { label: 'Boxes logged', value: boxCount, tab: 'boxes' },
-    { label: 'Open first', value: openFirstCount, tab: 'boxes' },
-    { label: 'Utilities done', value: `${utilitiesDone}/${AppEngine.UTILITIES.length}`, tab: 'addressutil' },
-    { label: 'Backup', value: state.backupExportedAt ? 'Saved' : 'Needed', tab: 'dashboard' }
-  ];
-
-  return `
-    <div class="mt-dashboard-shell">
-      <div class="mt-hero-card">
-        <div class="mt-dashboard-kicker">${days <= 7 ? 'Move week command center' : 'Move command center'}</div>
-        <h1>${getGreeting()}, ${esc(state.userName || 'friend')} 👋</h1>
-        <p>${days <= 7 ? 'Home stretch. We are making this annoyingly manageable.' : 'One small win at a time. Cardboard fears you.'}</p>
-
-        <div class="mt-command-grid">
-          <section class="mt-primary-action">
-            <div class="mt-command-label">Do next</div>
-            <button class="mt-primary-action-main" data-focus-open="${esc(primaryFocus.tab)}">
-              <span>${esc(primaryFocus.text)}</span>
-              <small>${esc(primaryFocus.phase)}</small>
-            </button>
-            ${renderFocusDoneButton(primaryFocus)}
-          </section>
-
-          <section class="mt-up-next-panel">
-            <div class="mt-command-label">Up next</div>
-            <div class="mt-focus-list">
-              ${secondaryFocus.length ? secondaryFocus.map(item => `
-                <div class="mt-focus-row">
-                  <button class="mt-focus-main" data-focus-open="${esc(item.tab)}">
-                    <span class="mt-focus-text">${esc(item.text)}</span>
-                    <small>${esc(item.phase)}</small>
-                  </button>
-                  ${renderFocusDoneButton(item)}
-                </div>
-              `).join('') : `
-                <div class="mt-empty mt-dashboard-empty">No other urgent items right now.</div>
-              `}
-            </div>
-          </section>
-        </div>
-
-        <div class="mt-progress-container">
-          <div class="mt-progress-track">
-            <div class="mt-progress-fill" style="width:${pct}%"></div>
-          </div>
-          <p>${pct}% done · ${done}/${total} tiny wins · ${esc(backupText)}</p>
-        </div>
-      </div>
-
-      <div class="mt-dashboard-signals">
-        ${signalCards.map(card => `
-          <button class="mt-signal-card" data-focus-open="${esc(card.tab)}">
-            <span>${esc(card.label)}</span>
-            <strong>${esc(card.value)}</strong>
-          </button>
-        `).join('')}
-      </div>
-
-      <div class="mt-dashboard-metrics">
-        <div class="mt-card" style="padding: 20px; margin:0; text-align:center;">
-          <div style="font-size: 28px; font-weight: 800; color:var(--text-main);">${days}</div>
-          <div class="mt-metric-label">Days left</div>
-        </div>
-        <div class="mt-card" style="padding: 20px; margin:0; text-align:center;">
-          <div style="font-size: 28px; font-weight: 800; color:var(--text-main);">${packedRooms}/${AppEngine.ROOMS.length}</div>
-          <div class="mt-metric-label">Rooms packed</div>
-        </div>
-        <div class="mt-card" style="padding: 20px; margin:0; text-align:center;">
-          <div style="font-size: 28px; font-weight: 800; color:var(--text-main);">${boxCount}</div>
-          <div class="mt-metric-label">Boxes logged</div>
-        </div>
-        <div class="mt-card" style="padding: 20px; margin:0; text-align:center;">
-          <div style="font-size: 28px; font-weight: 800; color:var(--text-main);">${savings.hasInputs ? `$${savings.low.toLocaleString()}–$${savings.high.toLocaleString()}` : 'Add details'}</div>
-          <div class="mt-metric-label">Avoidable costs</div>
-        </div>
-      </div>
-
-      <div class="mt-card" style="padding: 16px 20px; background: rgba(0,122,255,0.04); border-color: rgba(0,122,255,0.12); margin:20px 0 0;">
-        <p style="margin: 0; font-size: 13.5px; font-weight: 600; text-align:center; color: var(--text-main);">${esc(getFunStat())}${openFirstCount ? ` · ${openFirstCount} open-first box${openFirstCount === 1 ? '' : 'es'} should stay easy to grab.` : ''}</p>
-      </div>
-
-      ${needsApartmentHunt() ? `<div class="mt-card mt-apartment-actions">
-        <div class="mt-card-header">
-          <h3>Apartment actions</h3>
-          <button class="mt-mini-action" data-focus-open="apartments">Open tracker</button>
-        </div>
-        <div class="mt-card-body">
-          ${apartmentActions.length ? apartmentActions.map(action => `
-            <div class="mt-focus-row">
-              <button class="mt-focus-main" data-focus-open="${esc(action.tab)}">
-                <span class="mt-focus-text">${esc(action.text)}</span>
-                <small>${esc(action.phase)}</small>
-              </button>
-            </div>
-          `).join('') : `
-            <div class="mt-empty">No apartment deadlines yet. Add follow-up dates, apply-by dates, or cashier-check dates as listings get serious.</div>
-          `}
-        </div>
-      </div>` : ''}
-    </div>
-  `;
+  return window.MovingDashboard.renderDashboard(dashboardCtx());
 }
 
 function estimateSavings() {
-  const s = state.savings || {};
-  const deposit = Math.max(0, parseFloat(s.depositAmount) || 0);
-  const moverHourlyRate = Math.max(0, parseFloat(s.moverHourlyRate) || 0);
-  const avoidedMoverHours = Math.max(0, parseFloat(s.avoidedMoverHours) || 0);
-  const reusedBoxes = Math.max(0, parseInt(s.reusedBoxes, 10) || 0);
-  const avoidedDuplicateBuys = Math.max(0, parseFloat(s.avoidedDuplicateBuys) || 0);
-  const hasInputs = deposit > 0 || moverHourlyRate > 0 || reusedBoxes > 0 || avoidedDuplicateBuys > 0;
-  const depositLow = Math.round(deposit * 0.1);
-  const depositHigh = Math.round(deposit * 0.5);
-  const moverSavings = Math.round(moverHourlyRate * avoidedMoverHours);
-  const boxSavings = Math.round(reusedBoxes * 2.5);
-  const low = depositLow + moverSavings + boxSavings + avoidedDuplicateBuys;
-  const high = depositHigh + moverSavings + boxSavings + avoidedDuplicateBuys;
-  return { low, high, depositLow, depositHigh, moverSavings, boxSavings, avoidedDuplicateBuys, hasInputs };
+  return window.MovingSavings.estimateSavings(state);
+}
+
+function savingsCtx() {
+  return { AppEngine, state, esc };
 }
 
 function renderSavings() {
-  const s = state.savings || {};
-  const savings = estimateSavings();
-  const plays = AppEngine.SAVINGS_PLAYS || [];
-  return `
-    <div class="mt-alert-box">
-      <strong>The money thesis:</strong> this app saves money by preventing avoidable charges: mover overtime, duplicate supply runs, lost deposit deductions, missed donation/resale windows, and last-minute convenience purchases.
-    </div>
-    <div class="mt-dashboard-metrics">
-      <div class="mt-card" style="padding:18px; margin:0; text-align:center;"><div class="mt-box-big">$${savings.low.toLocaleString()}–$${savings.high.toLocaleString()}</div><div class="mt-metric-label">Estimated avoidable costs</div></div>
-      <div class="mt-card" style="padding:18px; margin:0; text-align:center;"><div class="mt-box-big">$${savings.depositLow.toLocaleString()}–$${savings.depositHigh.toLocaleString()}</div><div class="mt-metric-label">Deposit risk protected</div></div>
-      <div class="mt-card" style="padding:18px; margin:0; text-align:center;"><div class="mt-box-big">$${savings.moverSavings.toLocaleString()}</div><div class="mt-metric-label">Mover overtime avoided</div></div>
-      <div class="mt-card" style="padding:18px; margin:0; text-align:center;"><div class="mt-box-big">$${(savings.boxSavings + savings.avoidedDuplicateBuys).toLocaleString()}</div><div class="mt-metric-label">Supply/duplicate buys avoided</div></div>
-    </div>
-    <div class="mt-card">
-      <div class="mt-card-header"><h3>Savings estimate</h3></div>
-      <div class="mt-card-body" style="padding:16px 20px;">
-        <div class="mt-util-fields">
-          <label>Security deposit amount<input type="number" min="0" data-savings-field="depositAmount" value="${esc(s.depositAmount || '')}" placeholder="e.g. 3500" /></label>
-          <label>Mover hourly rate<input type="number" min="0" data-savings-field="moverHourlyRate" value="${esc(s.moverHourlyRate || '')}" placeholder="e.g. 225" /></label>
-          <label>Mover hours avoided<input type="number" min="0" step="0.5" data-savings-field="avoidedMoverHours" value="${esc(s.avoidedMoverHours || '')}" placeholder="e.g. 1.5" /></label>
-          <label>Borrowed/reused boxes<input type="number" min="0" data-savings-field="reusedBoxes" value="${esc(s.reusedBoxes || '')}" placeholder="e.g. 20" /></label>
-          <label>Duplicate buys avoided<input type="number" min="0" data-savings-field="avoidedDuplicateBuys" value="${esc(s.avoidedDuplicateBuys || '')}" placeholder="e.g. 80" /></label>
-        </div>
-      </div>
-    </div>
-    <div class="mt-card">
-      <div class="mt-card-header"><h3>Money-saving plays</h3></div>
-      <div class="mt-card-body">
-        ${plays.map((play, i) => {
-          const key = 'saving-' + i;
-          const isDone = !!state.checked[key];
-          return `
-            <div class="mt-item ${isDone ? 'done' : ''}">
-              <input type="checkbox" class="mt-check" data-check="${key}" ${isDone ? 'checked' : ''} aria-label="${esc(play.title)}" />
-              <div class="mt-item-text" data-check="${key}">
-                <strong>${esc(play.title)}</strong>
-                <div style="font-size:12px; color:var(--text-muted); margin-top:3px; line-height:1.45;">${esc(play.detail)}</div>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  `;
+  return window.MovingSavings.renderSavings(savingsCtx());
 }
 
 function getGreeting() {
@@ -905,41 +812,94 @@ function getGreeting() {
   return 'Good evening';
 }
 
+function getMoveTimelinePhases() {
+  let phases = AppEngine.TIMELINE_DATA_MATRIX;
+  if (isHouseMove()) {
+    const houseReplacements = {
+      '8wk': {
+        3: 'Ask both homes about truck parking, driveway/street access, stairs, large-item paths, and trash pickup rules [20m]'
+      },
+      '6wk': {
+        1: 'Send movers or helpers the driveway/street access, stairs, door measurements, and large-item path notes [15m]',
+        3: 'Choose the loading/staging area: driveway, garage, basement, porch, or safest curb spot [20m]',
+        4: 'Ask what repairs, paint touch-ups, yard cleanup, or trash rules apply before handoff [10m]'
+      },
+      '4wk': {
+        0: 'Confirm truck parking, driveway clearance, garage/basement staging, and the large-item path at both homes [15m]',
+        5: 'Confirm movers or helpers have the access notes, stairs, heavy-item list, and parking plan [10m]'
+      },
+      '2wk': {
+        0: 'Confirm helpers, movers, or rental-truck plans around driveway access, stairs, weather cover, and heavy-item risk [20m]',
+        3: 'Patch small holes and touch-ups only if your lease/sale agreement allows it [45m]'
+      },
+      'movingwk': {
+        0: 'Call movers or helpers to confirm arrival window, truck access, stairs, heavy items, and loading order [15m]',
+        3: 'Touch up allowed wall repairs after spackle dries; skip repainting whole walls unless required [45m]'
+      },
+      'moveday': {
+        1: 'Take empty-home photos/video: walls, floors, appliances, basement/garage, closets, windows, and repaired spots [20m]',
+        2: 'Hand off keys, garage openers, mailbox keys, and access codes; get written confirmation if possible [10m]',
+        4: 'Walk the driveway, garage, basement, stairs, and doorways before loading starts [10m]'
+      }
+    };
+
+    phases = phases.map(phase => ({
+      ...phase,
+      items: phase.items.map((item, index) => houseReplacements[phase.id]?.[index] || item)
+    }));
+  }
+
+  if (isDiyMove()) {
+    const diyReplacements = {
+      '8wk': {
+        2: 'Choose your DIY plan: rental vehicle, borrowed car, helper list, dollies, and heavy-item risks [45m]'
+      },
+      '6wk': {
+        0: 'Reserve the rental vehicle or lock helper availability once your date/window is realistic [30m]',
+        1: 'Send helpers the access notes, stairs/elevator details, heavy-item list, and expected time window [15m]'
+      },
+      '4wk': {
+        5: 'Confirm rental pickup/return, parking/loading plan, dollies, blankets, straps, and helper arrival times [10m]'
+      },
+      'movingwk': {
+        0: 'Confirm helpers, vehicle pickup, loading order, parking plan, weather backup, and food/water [15m]'
+      }
+    };
+
+    phases = phases.map(phase => ({
+      ...phase,
+      items: phase.items.map((item, index) => diyReplacements[phase.id]?.[index] || item)
+    }));
+  }
+
+  return phases;
+}
+
+function tasksCtx() {
+  return {
+    state,
+    esc,
+    getDynamicCalendarRange,
+    getMoveTimelinePhases,
+    isDiyMove,
+    isHouseMove
+  };
+}
+
 function renderPhaseList(phases) {
-  return phases.map(phase => {
-    return `
-      <div class="mt-card">
-        <div class="mt-card-header">
-          <h3>${esc(phase.label)}</h3>
-          <span class="date-range">${getDynamicCalendarRange(state.targetMoveDate, phase.weeksOut)}</span>
-        </div>
-        <div class="mt-card-body">
-          ${phase.items.map((text, i) => {
-            const key = phase.id + '-' + i;
-            const isDone = !!state.checked[key];
-            return `
-              <div class="mt-item ${isDone ? 'done' : ''}">
-                <input type="checkbox" class="mt-check" data-check="${key}" ${isDone ? 'checked' : ''} aria-label="${esc(text)}" />
-                <div class="mt-item-text" data-check="${key}">${esc(text)}</div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-    `;
-  }).join('');
+  return window.MovingTasks.renderPhaseList(tasksCtx(), phases);
+}
+
+function renderMoveStyleGuidanceCard() {
+  return window.MovingTasks.renderMoveStyleGuidanceCard(tasksCtx());
+}
+
+function renderBuildingGuidanceCard() {
+  return window.MovingTasks.renderBuildingGuidanceCard(tasksCtx());
 }
 
 function renderTasks() {
-  return `
-    <div class="mt-alert-box">
-      <strong>COI = Certificate of Insurance.</strong> Many apartment buildings require your mover to send this proof of insurance before move day. Ask each building for its exact COI wording, send that to your booked mover, then forward the completed COI back to building management for approval.
-    </div>
-    <div class="mt-alert-box">
-      <strong>Security deposit plan:</strong> check your lease before patching or painting. Usually small nail holes can be spackled, but large damage, paint matching, and wall anchors may have building-specific rules. Keep before/after photos and send your forwarding address when you return keys.
-    </div>
-    ${renderPhaseList(AppEngine.TIMELINE_DATA_MATRIX)}
-  `;
+  return window.MovingTasks.renderTasks(tasksCtx());
 }
 
 function renderAptSearch() {
@@ -954,356 +914,60 @@ function getMoverTipSummary() {
   return window.MovingMovers.getMoverTipSummary(moversCtx());
 }
 
+function suppliesCtx() {
+  return { AppEngine, state, esc };
+}
+
 function renderSupplies() {
-  const boxCalculations = AppEngine.calculateSuppliesConfig(state.aptSize);
-  return `
-    <div style="font-family:'Oswald', sans-serif; font-size:14px; text-transform:uppercase; margin-bottom:10px; color:var(--text-muted); font-weight:700; letter-spacing:0.02em;">Your rough box forecast:</div>
-    <div class="mt-supply-metrics">
-      <div class="mt-supply-badge"><span class="count">${boxCalculations.small}</span><span class="label">Small Boxes</span></div>
-      <div class="mt-supply-badge"><span class="count">${boxCalculations.medium}</span><span class="label">Medium Boxes</span></div>
-      <div class="mt-supply-badge"><span class="count">${boxCalculations.large}</span><span class="label">Large Boxes</span></div>
-      <div class="mt-supply-badge"><span class="count">${boxCalculations.tape} Rolls</span><span class="label">Packing Tape</span></div>
-      <div class="mt-supply-badge"><span class="count">${boxCalculations.paper} Packs</span><span class="label">Wrapping Paper</span></div>
-    </div>
-    <p style="font-size:12px; color:var(--text-muted); margin: 4px 0 20px;">
-      For the boxes/tape/paper above: <a href="https://www.amazon.com/s?k=moving+boxes+kit" target="_blank" rel="noopener noreferrer">Amazon moving box kits</a>,
-      U-Haul's box centers (they buy back unused boxes), or a FedEx Office/The UPS Store if you just need a handful of sturdy ones.
-    </p>
-    <div class="mt-card">
-      <div class="mt-card-header"><h3>Stuff to buy before the tape panic</h3></div>
-      <div class="mt-card-body">
-        ${AppEngine.SUPPLIES.map((supply, i) => {
-          const key = 'supply-' + i;
-          const isDone = !!state.checked[key];
-          const amazonUrl = `https://www.amazon.com/s?k=${encodeURIComponent(supply.name)}`;
-          return `
-            <div class="mt-item ${isDone ? 'done' : ''}">
-              <input type="checkbox" class="mt-check" data-check="${key}" ${isDone ? 'checked' : ''} aria-label="${esc(supply.name)}" />
-              <div class="mt-item-text" data-check="${key}">
-                ${esc(supply.name)}
-                <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">
-                  Try: ${esc(supply.store)} · <a href="${amazonUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">Search on Amazon</a>
-                </div>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  `;
+  return window.MovingSupplies.renderSupplies(suppliesCtx());
 }
 
 function renderMovers() {
   return window.MovingMovers.renderMovers(moversCtx());
 }
 
-const ROOM_ICONS = { 'Kitchen': '🍳', 'Bedroom': '🛏️', 'Bathroom': '🚿', 'Closet': '👕', 'Living Room': '🛋️', 'Entryway/Storage': '📦' };
-const ACTION_TAGS = {
-  'bring': { label: 'Bring', color: '#2f6fed' },
-  'buy-new': { label: 'Buy new at destination', color: '#c9832f' },
-  'donate': { label: 'Donate / purge', color: '#3f9e5e' },
-  'optional': { label: 'Optional', color: '#8a8a94' }
-};
-
-function renderDonationSuggestions() {
-  const suggestions = AppEngine.DONATION_GUIDE || {};
-  const rooms = AppEngine.ROOMS.filter(room => Array.isArray(suggestions[room]) && suggestions[room].length);
-  return `
-    <div class="mt-card mt-donation-sweep">
-      <div class="mt-card-header">
-        <div>
-          <h3>Donation sweep</h3>
-          <p class="mt-muted-copy" style="margin:4px 0 0;">No item-by-item logging. Use these as default purge prompts while you pack each room.</p>
-        </div>
-        <button class="mt-secondary-btn" data-tab-jump="boxes">Open box plan</button>
-      </div>
-      <div class="mt-donation-grid">
-        ${rooms.map(room => `
-          <div class="mt-donation-room">
-            <h4>${esc(ROOM_ICONS[room] || '📦')} ${esc(room)}</h4>
-            <div class="mt-donation-checklist">
-              ${suggestions[room].map((item, i) => {
-                const key = `donation-${room}-${i}`;
-                const isDone = !!state.checked[key];
-                return `
-                  <div class="mt-item ${isDone ? 'done' : ''}">
-                    <input type="checkbox" class="mt-check" data-check="${esc(key)}" ${isDone ? 'checked' : ''} aria-label="${esc(item)}" />
-                    <div class="mt-item-text" data-check="${esc(key)}">${esc(item)}</div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `;
-}
-
-function renderInstalledItemReminders() {
-  const reminders = AppEngine.INSTALLED_ITEM_REMINDERS || [];
-  if (!reminders.length) return '';
-  return `
-    <div class="mt-card mt-installed-card">
-      <div class="mt-card-header">
-        <div>
-          <h3>Installed things to take back</h3>
-          <p class="mt-muted-copy" style="margin:4px 0 0;">Upgrades you bought can be easy to forget because they feel like part of the apartment.</p>
-        </div>
-      </div>
-      <div class="mt-installed-grid">
-        ${reminders.map((item, i) => {
-          const key = `installed-${i}`;
-          const isDone = !!state.checked[key];
-          return `
-            <label class="mt-installed-item ${isDone ? 'done' : ''}">
-              <input type="checkbox" class="mt-check" data-check="${key}" ${isDone ? 'checked' : ''} aria-label="${esc(item.title)}" />
-              <div>
-                <div class="mt-installed-title">${esc(item.title)} <span>${esc(item.timing)}</span></div>
-                <p>${esc(item.action)}</p>
-                <small>${esc(item.why)} ${item.room ? `Area: ${esc(item.room)}.` : ''}</small>
-              </div>
-            </label>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  `;
-}
-
-function renderBulkyDonationRules() {
-  const rules = AppEngine.BULKY_DONATION_RULES || [];
-  if (!rules.length) return '';
-  return `
-    <div class="mt-card mt-bulky-card">
-      <div class="mt-card-header">
-        <div>
-          <h3>Bulky item reality check</h3>
-          <p class="mt-muted-copy" style="margin:4px 0 0;">Bigger donations need a decision earlier because pickup windows and elevator logistics get annoying fast.</p>
-        </div>
-      </div>
-      <div class="mt-card-body">
-        ${rules.map((rule, i) => {
-          const key = `bulky-donation-${i}`;
-          const isDone = !!state.checked[key];
-          return `
-            <div class="mt-item ${isDone ? 'done' : ''}">
-              <input type="checkbox" class="mt-check" data-check="${key}" ${isDone ? 'checked' : ''} aria-label="${esc(rule)}" />
-              <div class="mt-item-text" data-check="${key}">${esc(rule)}</div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  `;
+function roomsCtx() {
+  return {
+    AppEngine,
+    state,
+    esc
+  };
 }
 
 function renderRooms() {
-  const cards = AppEngine.ROOMS.map(room => {
-    const guide = AppEngine.ROOM_PACKING_GUIDE[room] || [];
-    const checklist = state.roomChecklist[room] || {};
-    const checkedCount = guide.filter(g => checklist[g.item]).length;
-    const total = guide.length;
-    const status = state.rooms[room] || 'Not started';
-    let statusColor = 'var(--text-muted)';
-    if (status === 'In progress') statusColor = '#c9832f';
-    else if (status === 'Packed') statusColor = '#3f9e5e';
-
-    return `
-      <details class="mt-cat mt-room-card" ${status !== 'Packed' ? 'open' : ''}>
-        <summary style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; list-style:none;">
-          <h4 style="margin:0; display:flex; align-items:center; gap:8px;"><span>${ROOM_ICONS[room] || '📦'}</span>${esc(room)}</h4>
-          <span style="font-size:11.5px; font-weight:700; color:${statusColor};">${checkedCount}/${total} packed</span>
-        </summary>
-        <div style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
-          ${guide.map(g => {
-            const isChecked = !!checklist[g.item];
-            const tag = ACTION_TAGS[g.action];
-            return `
-              <label class="mt-room-item ${isChecked ? 'done' : ''}" style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
-                <input type="checkbox" class="mt-room-item-checkbox" data-room="${esc(room)}" data-item="${esc(g.item)}" ${isChecked ? 'checked' : ''} style="margin-top:3px; flex-shrink:0;" />
-                <div>
-                  <div style="font-size:13.5px; font-weight:600; ${isChecked ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">
-                    ${esc(g.item)}
-                    ${tag ? `<span style="font-size:10px; font-weight:700; color:white; background:${tag.color}; padding:2px 7px; border-radius:10px; margin-left:6px; white-space:nowrap;">${tag.label}</span>` : ''}
-                  </div>
-                  <div style="font-size:12px; color:var(--text-muted); margin-top:3px; line-height:1.4;">${esc(g.tip)}</div>
-                </div>
-              </label>
-            `;
-          }).join('')}
-        </div>
-      </details>
-    `;
-  }).join('');
-
-  return `
-    <div class="mt-alert-box">
-      <strong>Room flow:</strong> purge first, pack second, then use Box Inventory for the final box labels and contents.
-    </div>
-    ${renderInstalledItemReminders()}
-    ${renderBulkyDonationRules()}
-    ${renderDonationSuggestions()}
-    <div class="mt-mover-grid" style="grid-template-columns: 1fr;">${cards}</div>
-  `;
+  return window.MovingRooms.renderRooms(roomsCtx());
 }
 
 
-function getDateNudge(dateStr, leadText) {
-  if (!dateStr) return leadText;
-  const target = new Date(dateStr + 'T00:00:00');
-  const now = new Date();
-  const daysAway = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
-  if (daysAway < 0) return 'Date passed — double-check it happened.';
-  if (daysAway <= 3) return 'Coming up fast. Confirm the window.';
-  return leadText;
+function utilitiesCtx() {
+  return {
+    AppEngine,
+    state,
+    esc
+  };
 }
 
 function renderAddressUtil() {
-  const statusOptions = [
-    ['not-started', 'Not started'],
-    ['scheduled', 'Scheduled'],
-    ['confirmed', 'Confirmed'],
-    ['done', 'Done']
-  ];
-  const actionOptions = [
-    ['transfer', 'Transfer'],
-    ['cancel', 'Cancel'],
-    ['start-new', 'Start new'],
-    ['ask-building', 'Ask building']
-  ];
-
-  const cards = AppEngine.UTILITIES.map(u => {
-    const rec = state.utilities[u] || {};
-    const guide = AppEngine.UTILITY_GUIDE[u] || { lead: 'Set early', nudge: 'Confirm timing with your provider or building.' };
-    return `
-      <div class="mt-util-card">
-        <div class="mt-util-head">
-          <div>
-            <h4>${esc(u)}</h4>
-            <span>${esc(guide.lead)}</span>
-          </div>
-          <select data-util="${esc(u)}" data-util-field="status">
-            ${statusOptions.map(([value, label]) => `<option value="${value}" ${rec.status === value ? 'selected' : ''}>${label}</option>`).join('')}
-          </select>
-        </div>
-        <p class="mt-util-nudge">${esc(getDateNudge(rec.newStartDate, guide.nudge))}</p>
-        <div class="mt-util-fields">
-          <label>Action<select data-util="${esc(u)}" data-util-field="action">${actionOptions.map(([value, label]) => `<option value="${value}" ${rec.action === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
-          <label>Provider<input type="text" data-util="${esc(u)}" data-util-field="provider" value="${esc(rec.provider || '')}" placeholder="Provider name" /></label>
-          <label>Phone / portal<input type="text" data-util="${esc(u)}" data-util-field="phone" value="${esc(rec.phone || '')}" placeholder="Phone, URL, or app" /></label>
-          <label>Old place off<input type="date" data-util="${esc(u)}" data-util-field="oldCancelDate" value="${esc(rec.oldCancelDate || '')}" /></label>
-          <label>New place on<input type="date" data-util="${esc(u)}" data-util-field="newStartDate" value="${esc(rec.newStartDate || '')}" /></label>
-          <label>Account #<input type="text" data-util="${esc(u)}" data-util-field="account" value="${esc(rec.account || '')}" placeholder="Optional" /></label>
-          <label>Confirmation #<input type="text" data-util="${esc(u)}" data-util-field="confirmation" value="${esc(rec.confirmation || '')}" placeholder="Optional" /></label>
-          <label>Notes<input type="text" data-util="${esc(u)}" data-util-field="notes" value="${esc(rec.notes || '')}" placeholder="Appointment window, login, etc." /></label>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  return `
-    <div class="mt-alert-box">
-      <strong>Utility rule of thumb:</strong> internet gets weird fastest, so book it early. Electric/gas usually need less lead time, but appointment windows can still sneak up on you.
-    </div>
-    <div class="mt-card">
-      <div class="mt-card-header"><h3>Update your address</h3></div>
-      <div class="mt-card-body">
-        ${AppEngine.ADDRESS_CHANGES.map((text, i) => {
-          const key = 'addr-' + i;
-          const isDone = !!state.checked[key];
-          return `
-            <div class="mt-item ${isDone ? 'done' : ''}">
-              <input type="checkbox" class="mt-check" data-check="${key}" ${isDone ? 'checked' : ''} aria-label="${esc(text)}" />
-              <div class="mt-item-text" data-check="${key}">${esc(text)}</div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-    <div class="mt-guide-grid" style="margin-top:20px;">${cards}</div>
-    <div class="mt-card" style="margin-top:4px;">
-      <div class="mt-card-header"><h3>Important contacts</h3></div>
-      <div class="mt-card-body">
-        <div class="mt-util-fields">
-          <label>Movers<input type="text" data-contact="movers" value="${esc(state.contacts?.movers || '')}" placeholder="Company / dispatcher / arrival window" /></label>
-          <label>Current building<input type="text" data-contact="doorman" value="${esc(state.contacts?.doorman || '')}" placeholder="Doorman, super, management" /></label>
-          <label>New building<input type="text" data-contact="newSuper" value="${esc(state.contacts?.newSuper || '')}" placeholder="Super, elevator, keys" /></label>
-          <label>Emergency backup<input type="text" data-contact="emergency" value="${esc(state.contacts?.emergency || '')}" placeholder="Friend/family backup" /></label>
-        </div>
-      </div>
-    </div>
-  `;
+  return window.MovingUtilities.renderAddressUtil(utilitiesCtx());
 }
 
 function renderBoxes() {
   return window.MovingBoxes.renderBoxes(boxesCtx());
 }
 
+function dayOfCtx() {
+  return {
+    AppEngine,
+    state,
+    esc,
+    renderMoveStyleGuidanceCard,
+    renderBuildingGuidanceCard,
+    getMoverTipSummary
+  };
+}
+
 function renderDayOf() {
-  const { tip, perMover, totalTip } = getMoverTipSummary();
-  const guide = AppEngine.MOVER_TIPPING_GUIDE || {};
-
-  return `
-    <div class="mt-alert-box">
-      <strong>Move day mode:</strong> this is not the day for cleverness. Follow the run sheet, drink water, and protect the essentials box like it is a royal heirloom.
-    </div>
-    <div class="mt-guide-grid">
-      ${AppEngine.MOVE_DAY_STAGES.map(stage => `
-        <div class="mt-card">
-          <div class="mt-card-header"><h3>${esc(stage.emoji)} ${esc(stage.title)}</h3></div>
-          <div class="mt-card-body">
-            ${stage.items.map((item, i) => {
-              const key = 'dayof-' + stage.title.replace(/\W+/g, '-').toLowerCase() + '-' + i;
-              const isDone = !!state.checked[key];
-              return `
-                <div class="mt-item ${isDone ? 'done' : ''}">
-                  <input type="checkbox" class="mt-check" data-check="${key}" ${isDone ? 'checked' : ''} aria-label="${esc(item)}" />
-                  <div class="mt-item-text" data-check="${key}">${esc(item)}</div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-      `).join('')}
-    </div>
-
-    <div class="mt-card mt-tip-card">
-      <div class="mt-card-header"><h3>💵 Mover tipping guide</h3></div>
-      <div class="mt-card-body">
-        <p class="mt-muted-copy"><strong>Rule of thumb:</strong> ${esc(guide.simpleRule || '$5–$10 per mover per hour is a common practical range.')}</p>
-        <div class="mt-util-fields">
-          <label>Crew size<input type="number" min="1" max="12" data-tip-field="crewSize" value="${esc(tip.crewSize || 3)}" /></label>
-          <label>Hours worked<input type="number" min="1" max="16" step="0.5" data-tip-field="hours" value="${esc(tip.hours || 4)}" /></label>
-          <label>Base $ / mover / hour<input type="number" min="0" max="50" step="1" data-tip-field="rate" value="${esc(tip.rate || 8)}" /></label>
-          <label>Service vibe<select data-tip-field="service">
-            <option value="okay" ${tip.service === 'okay' ? 'selected' : ''}>Okay / basic</option>
-            <option value="good" ${tip.service === 'good' ? 'selected' : ''}>Good</option>
-            <option value="great" ${tip.service === 'great' ? 'selected' : ''}>Great / lifesavers</option>
-          </select></label>
-        </div>
-        <div class="mt-tip-result">
-          <div><span>Suggested per mover</span><strong>$${perMover.toLocaleString()}</strong></div>
-          <div><span>Total tip</span><strong>$${totalTip.toLocaleString()}</strong></div>
-        </div>
-        <p class="mt-muted-copy">${esc(guide.cashNote || 'Cash in separate envelopes is easiest when you want each mover to get their share directly.')}</p>
-        <div class="mt-two-col-list">
-          <div><strong>Tip more for:</strong><ul>${(guide.raiseFor || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
-          <div><strong>Tip less / ask questions for:</strong><ul>${(guide.lowerFor || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="mt-card">
-      <div class="mt-card-header"><h3>Extra reminders</h3></div>
-      <div class="mt-card-body">
-        <ul class="mt-tight-list">
-          ${AppEngine.MOVE_TIPS.map(t => `<li>${esc(t)}</li>`).join('')}
-        </ul>
-      </div>
-    </div>
-    <textarea class="mt-notes-area" id="mt-notes" placeholder="Drop mover arrival windows, elevator info, super phone, food plan, or chaos notes here..." style="width:100%; min-height:180px; box-sizing:border-box; padding:12px; border-radius:8px; border:1px solid var(--border-color); font-family:inherit; font-size:13px; line-height:1.5; margin-top:15px;">${esc(state.notes || '')}</textarea>
-  `;
+  return window.MovingDayOf.renderDayOf(dayOfCtx());
 }
 
 function render() {
@@ -1351,14 +1015,8 @@ function attachHandlers() {
   const exportBtn = root.querySelector('#mt-export-backup');
   if (exportBtn) {
     exportBtn.addEventListener('click', () => {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
       const dateStamp = new Date().toISOString().slice(0, 10);
-      a.href = url;
-      a.download = `moving-assistant-backup-${dateStamp}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadTextFile(`moving-assistant-backup-${dateStamp}.json`, JSON.stringify(state, null, 2), 'application/json');
       state.backupExportedAt = new Date().toISOString();
       AppEngine.saveState(state);
       render();
@@ -1369,6 +1027,14 @@ function attachHandlers() {
     btn.addEventListener('click', () => {
       const exportTrigger = root.querySelector('#mt-export-backup');
       if (exportTrigger) exportTrigger.click();
+    });
+  });
+
+  root.querySelectorAll('[data-export-calendar]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const calendar = window.MovingDeadlines.buildCalendarFile(deadlineCtx());
+      downloadTextFile(`moving-assistant-deadlines-${dateStamp}.ics`, calendar, 'text/calendar');
     });
   });
 

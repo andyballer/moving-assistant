@@ -5,6 +5,6 @@
   "description": "A static moving dashboard for apartment hunting, packing, utilities, movers, and move-day planning.",
   "scripts": {
     "test": "node --test",
-    "check:js": "node --check src/js/state.js && node --check src/js/apartments.js && node --check src/js/boxes.js && node --check src/js/movers.js && node --check src/js/app.js && node --check sw.js"
+    "check:js": "node --check src/js/state.js && node --check src/js/apartments.js && node --check src/js/boxes.js && node --check src/js/movers.js && node --check src/js/dashboard.js && node --check src/js/rooms.js && node --check src/js/utilities.js && node --check src/js/deadlines.js && node --check src/js/dayof.js && node --check src/js/savings.js && node --check src/js/supplies.js && node --check src/js/tasks.js && node --check src/js/app.js && node --check sw.js"
   }
 }

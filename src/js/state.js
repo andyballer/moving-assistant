@@ -13,7 +13,7 @@ window.MovingApp.LEGACY_STORAGE_KEYS = [
   'move-tracker:state:v2',
   'move-tracker:state:v1'
 ];
-window.MovingApp.SCHEMA_VERSION = 10;
+window.MovingApp.SCHEMA_VERSION = 13;
 
 window.MovingApp.DONATION_CATEGORIES = ['Books', 'Games', 'Clothes', 'Electronics', 'Other'];
 window.MovingApp.ROOMS = ['Kitchen', 'Bedroom', 'Bathroom', 'Closet', 'Living Room', 'Entryway/Storage'];
@@ -134,9 +134,19 @@ window.MovingApp.ROOM_PACKING_GUIDE = {
 window.MovingApp.UTILITIES = ['Electric', 'Gas', 'Internet/Cable', 'Water (if applicable)'];
 
 window.MovingApp.UTILITY_GUIDE = {
-  'Electric': { lead: '1–2 weeks ahead', nudge: 'Set activation for move-in day or the day before. Nobody wants first-night flashlight vibes.' },
-  'Gas': { lead: '1–2 weeks ahead', nudge: 'If heat, hot water, or the stove depends on gas, confirm any appointment window early.' },
-  'Internet/Cable': { lead: '2–3 weeks ahead', nudge: 'Book this early. First night without Wi‑Fi is how you end up watching one downloaded episode forever.' },
+  'Electric': { lead: '1-2 weeks ahead', nudge: 'Set activation for move-in day or the day before. Nobody wants first-night flashlight vibes.' },
+  'Gas': { lead: '1-2 weeks ahead', nudge: 'If heat, hot water, or the stove depends on gas, confirm any appointment window early.' },
+  'Internet/Cable': {
+    lead: '2-3 weeks ahead',
+    nudge: 'Schedule cancellation for the day after your last needed internet use, and return rented modem/router/cable boxes right after service ends.',
+    checklist: [
+      'Call or chat with the provider 2-3 weeks before move day to schedule old-service cancellation or transfer.',
+      'Set the old-service stop date for the day after your last work/packing night unless your billing cycle makes an earlier cutoff worth it.',
+      'Ask exactly which devices must be returned: modem, router, cable boxes, remotes, power cords, and any Wi-Fi pods.',
+      'Return rented devices as soon as service ends; keep the drop-off receipt/tracking number and photo of serial numbers until the final bill clears.',
+      'Write the cancellation confirmation number and return receipt in this card.'
+    ]
+  },
   'Water (if applicable)': { lead: 'Ask building/landlord', nudge: 'Often handled by the building or landlord, but worth confirming so it does not become a move-in surprise.' }
 };
 
@@ -273,6 +283,30 @@ window.MovingApp.MOVERS = [
     watchFor: 'Storage/options may be more limited than larger national-style movers; confirm add-ons.',
     bestFor: 'Inter-borough moves, Brooklyn routes, and smaller full-service moves with strong review signals.',
     desc: 'Brooklyn-based, popular with young professionals doing apartment moves; good price-to-service balance.'
+  }
+];
+
+window.MovingApp.FIRST_WEEK_STAGES = [
+  {
+    title: 'First 24 hours',
+    emoji: '🧭',
+    items: [
+      'Confirm lights, hot water, heat/AC, stove, fridge, and locks all work',
+      'Plug in router/modem and note any internet activation or equipment issue',
+      'Put keys, fobs, mailbox info, trash room, laundry, and package pickup details in one note',
+      'Photograph move-in condition before unpacking hides wall, floor, or appliance problems'
+    ]
+  },
+  {
+    title: 'First week closeout',
+    emoji: '✅',
+    items: [
+      'Send current landlord/building your forwarding address and deposit-return request if not already done',
+      'Confirm old utilities and internet are fully canceled and save final confirmation numbers',
+      'Return rented modem/router/cable boxes and keep the receipt or tracking number',
+      'Update address for banking, payroll, insurance, prescriptions, voter/DMV needs, and core deliveries',
+      'Do one quiet sweep for missing open-first items before buying duplicates'
+    ]
   }
 ];
 
@@ -502,14 +536,10 @@ window.MovingApp.defaultState = function() {
     targetMoveDate: '',
     aptSize: '1br',
     moveProfile: {
-      market: 'nyc',
-      distance: 'local',
-      housing: 'renter',
       apartmentHunt: true,
       moveStyle: 'movers',
       buildingType: 'apartment'
     },
-    city: '',
     neighborhoods: [...window.MovingApp.DEFAULT_NEIGHBORHOODS],
     targetBudgetMin: '',
     targetBudgetMax: '',
@@ -580,14 +610,11 @@ window.MovingApp.sanitizeState = function(input) {
   merged.aptSize = ['studio', '1br', '2br', '3br'].includes(input.aptSize) ? input.aptSize : '1br';
   const profile = input.moveProfile && typeof input.moveProfile === 'object' && !Array.isArray(input.moveProfile) ? input.moveProfile : {};
   merged.moveProfile = {
-    market: ['nyc', 'other'].includes(profile.market) ? profile.market : 'nyc',
-    distance: ['local', 'long-distance'].includes(profile.distance) ? profile.distance : 'local',
-    housing: ['renter', 'owner'].includes(profile.housing) ? profile.housing : 'renter',
     apartmentHunt: typeof profile.apartmentHunt === 'boolean' ? profile.apartmentHunt : true,
     moveStyle: ['movers', 'diy'].includes(profile.moveStyle) ? profile.moveStyle : 'movers',
     buildingType: ['apartment', 'house'].includes(profile.buildingType) ? profile.buildingType : 'apartment'
   };
-  merged.city = typeof input.city === 'string' ? input.city : '';
+  delete merged.city;
   merged.neighborhoods = Array.isArray(input.neighborhoods)
     ? input.neighborhoods.map(String).map(x => x.trim()).filter(Boolean).slice(0, 12)
     : [...window.MovingApp.DEFAULT_NEIGHBORHOODS];
