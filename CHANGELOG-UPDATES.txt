@@ -1,6 +1,12 @@
 Moving Assistant — Product Update Changelog
 
 2026-07-08
+- Reworked the Dashboard into a stronger guided coach surface with current-stage summary, outstanding gap callouts, and a clearer next 10-minute action.
+- Simplified navigation into Start Here, Work, Apartment, and Reference groups so the app pulls from Today first instead of treating every tool as equal.
+- Ranked Apartment Hunt sources with "start here" recommendations for NYC bedroom searches and moved secondary sources behind a backup list.
+- Replaced Box Inventory's per-box delete confirmation modal with an inline undo banner so cleanup no longer prompts one box at a time.
+- Added an undo button for suggested Box Inventory boxes, including older untouched boxes created before the undo metadata existed.
+- Kept the active left-sidebar tab scrolled into view after Dashboard jumps so the current section is easier to locate.
 - Added first-week follow-up dates to the shared Dashboard deadline and calendar-export pipeline.
 - Moved remaining header/mobile-menu shell inline styles into CSS classes.
 - Extracted task timeline and move-guidance rendering into `src/js/tasks.js` while keeping timeline calculation shared in the app shell.

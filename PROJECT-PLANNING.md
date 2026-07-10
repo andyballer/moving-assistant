@@ -4,6 +4,69 @@
 
 This is the living planning file for the project. It should help Codex act as a high-quality engineer/PM partner, not just store a list of ideas.
 
+## Handoff Snapshot (2026-07-09 End Of Chat)
+
+Use this section as the next chat's starting point. Last committed checkpoint is `7cb7eef Improve moving assistant workflow modules` on `main`. Everything below is implemented and verified locally but **not committed yet**.
+
+Current uncommitted product work:
+
+- Dashboard now behaves more like a guided coach:
+  - Left nav entry is `Today`, not `Dashboard`.
+  - Dashboard shows `Where you should be`, current stage, current timeline phase progress, outstanding gaps, and a `Next 10-minute win`.
+  - Dashboard still has secondary `Up next`, status signal cards, deadline chips, progress, and export calendar.
+- Navigation is simplified into four groups:
+  - `Start Here`: Today
+  - `Work`: Timeline, Rooms, Boxes, Utilities
+  - `Apartment`: Search, Tracker
+  - `Reference`: Move Day, Supplies, Movers, Costs
+  - Mobile menu mirrors this grouping.
+- Apartment Search now recommends where to click first instead of showing a flat list:
+  - StreetEasy = primary NYC 1BR inventory/search
+  - Openigloo = building/landlord verification before tours
+  - Listings Project = community/sublet/human leads
+  - NYC Housing Connect = affordable-housing long game
+  - Secondary sources are hidden under `More backup sources`.
+- Box Inventory has safer undo behavior:
+  - Suggested-plan boxes get `source: 'suggested-plan'` and `sourceKey`.
+  - Older untouched suggested boxes can be undone via `Undo suggested boxes`.
+  - Per-box delete confirmation modal was removed; deleting now shows an inline `Removed ... Undo` banner.
+  - `state.recentlyRemovedBox` is sanitized/preserved so the inline undo survives render/save.
+- Sidebar active item scrolls into view after render/dashboard jumps.
+- Service worker cache is bumped to `moving-assistant-v61`.
+- `CHANGELOG-UPDATES.txt` already records the latest work.
+
+Verification already run after the latest changes:
+
+- `npm test` passed: 20/20
+- `npm run check:js` passed
+- Browser smoke check was done with a temporary cache-busted localhost harness because the in-app browser held onto an older service-worker shell:
+  - Confirmed new Dashboard coach UI renders.
+  - Confirmed simplified nav groups render.
+  - Confirmed Apartment Search ranked source panel renders.
+  - Temporary harness was deleted; local servers were stopped.
+
+Current dirty files expected after this handoff:
+
+- `CHANGELOG-UPDATES.txt`
+- `PROJECT-PLANNING.md`
+- `src/css/style.css`
+- `src/js/apartments.js`
+- `src/js/app.js`
+- `src/js/boxes.js`
+- `src/js/dashboard.js`
+- `src/js/state.js`
+- `sw.js`
+- `test/smoke.test.js`
+- `.DS_Store` and `src/.DS_Store` are also dirty; leave them alone unless the user explicitly asks.
+
+Good next steps for the next chat:
+
+- Re-run `git status --short`, `npm test`, and `npm run check:js`.
+- Optionally do one more browser pass after clearing/updating the service worker cache.
+- Review the uncommitted diff for any copy/style polish.
+- Commit the intentional files if the user wants a checkpoint; do not stage `.DS_Store`.
+- Next product direction: continue reducing tab-hunting by making Dashboard actions more directly completable, then consider snooze/not-relevant states for focus items.
+
 ## How To Use This File
 
 At the start of future work:
@@ -321,11 +384,17 @@ Do not add a market or region selector to setup. If NYC depth expands, it expand
 ## UX / UI Improvement Ideas
 
 - Make the Dashboard a calm command center rather than a collection of equal cards.
+- Keep pushing the product toward a guided-coach flow: Dashboard should answer "what should I do next, why now, and what is outstanding?" before exposing tabs.
+- Keep navigation compact and secondary; avoid making every tool feel like a required destination.
+- Rank apartment search sources by the user's current hunt shape instead of presenting every website as equally important.
 - Add `Today / This Week / Later` grouping for focus items.
 - Let users snooze or mark focus items as not relevant.
 - Use collapsible sections for text-heavy tabs.
 - Add compact/detail modes for dense operational views.
 - Add sticky mini-actions on mobile, especially `Add box`, `Search boxes`, and `Today`.
+- Keep left-side navigation context visible after dashboard jumps by scrolling the active tab into view.
+- Treat bulk actions like suggested box creation as reversible, with undo paths that preserve user-edited records.
+- Prefer inline undo for frequent cleanup actions instead of modal confirmations that interrupt every item.
 - Improve tap target sizes for status chips and tiny action links.
 - Reduce inline styles as files are touched; move repeated styles into CSS classes.
 - Make empty states more action-oriented.

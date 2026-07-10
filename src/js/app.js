@@ -10,17 +10,17 @@ if (!state.activeTab) {
 // category: 'general' shows above the two columns; 'apartment' = finding a new place;
 // 'moveout' = moving out of the current place.
 const appSections = [
-  { id: 'dashboard', label: 'Dashboard', icon: '🏠', category: 'general' },
-  { id: 'savings', label: 'Savings', icon: '💵', category: 'general' },
-  { id: 'aptsearch', label: 'Apartment Hunt', icon: '🔍', category: 'apartment' },
-  { id: 'apartments', label: 'Apartment Tracker', icon: '🏢', category: 'apartment' },
-  { id: 'tasks', label: 'Move Timeline', icon: '📋', category: 'moveout' },
-  { id: 'supplies', label: 'Supplies', icon: '📦', category: 'moveout' },
-  { id: 'rooms', label: 'Room Packing', icon: '🧳', category: 'moveout' },
-  { id: 'boxes', label: 'Box Inventory', icon: '🏷️', category: 'moveout' },
-  { id: 'movers', label: 'Movers', icon: '🚛', category: 'moveout' },
-  { id: 'addressutil', label: 'Address & Utilities', icon: '⚡', category: 'moveout' },
-  { id: 'dayof', label: 'Move Day', icon: '🎯', category: 'moveout' }
+  { id: 'dashboard', label: 'Today', icon: '🏠', category: 'general', navGroup: 'Start Here' },
+  { id: 'tasks', label: 'Timeline', icon: '📋', category: 'moveout', navGroup: 'Work' },
+  { id: 'rooms', label: 'Rooms', icon: '🧳', category: 'moveout', navGroup: 'Work' },
+  { id: 'boxes', label: 'Boxes', icon: '🏷️', category: 'moveout', navGroup: 'Work' },
+  { id: 'addressutil', label: 'Utilities', icon: '⚡', category: 'moveout', navGroup: 'Work' },
+  { id: 'aptsearch', label: 'Search', icon: '🔍', category: 'apartment', navGroup: 'Apartment' },
+  { id: 'apartments', label: 'Tracker', icon: '🏢', category: 'apartment', navGroup: 'Apartment' },
+  { id: 'dayof', label: 'Move Day', icon: '🎯', category: 'moveout', navGroup: 'Reference' },
+  { id: 'supplies', label: 'Supplies', icon: '📦', category: 'moveout', navGroup: 'Reference' },
+  { id: 'movers', label: 'Movers', icon: '🚛', category: 'moveout', navGroup: 'Reference' },
+  { id: 'savings', label: 'Costs', icon: '💵', category: 'general', navGroup: 'Reference' }
 ];
 
 function getMoveProfile() {
@@ -275,7 +275,8 @@ window.openMobileMenu = function() {
   const visibleSections = getVisibleAppSections();
   const generalSecs = visibleSections.filter(s => s.category === 'general');
   const aptSecs = visibleSections.filter(s => s.category === 'apartment');
-  const moveoutSecs = visibleSections.filter(s => s.category === 'moveout');
+  const workSecs = visibleSections.filter(s => s.navGroup === 'Work');
+  const referenceSecs = visibleSections.filter(s => s.navGroup === 'Reference');
 
   overlay.innerHTML = `
     <div class="mt-mobile-menu-header">
@@ -293,8 +294,12 @@ window.openMobileMenu = function() {
         </div>
       ` : ''}
       <div class="mt-mobile-column">
-        <div class="mt-mobile-column-title">📦 Moving Out</div>
-        <div class="mt-mobile-grid-bubbles">${moveoutSecs.map(bubble).join('')}</div>
+        <div class="mt-mobile-column-title">📦 Work</div>
+        <div class="mt-mobile-grid-bubbles">${workSecs.map(bubble).join('')}</div>
+      </div>
+      <div class="mt-mobile-column">
+        <div class="mt-mobile-column-title">🗂 Reference</div>
+        <div class="mt-mobile-grid-bubbles">${referenceSecs.map(bubble).join('')}</div>
       </div>
     </div>
     <div class="mt-mobile-menu-bottom">
@@ -626,6 +631,60 @@ function getTodaysFocusItems() {
   }).slice(0, 3);
 }
 
+function getStageName(days) {
+  if (days <= 0) return 'move day / first-week follow-up';
+  if (days <= 7) return 'move week execution';
+  if (days <= 14) return 'final confirmation and open-first packing';
+  if (days <= 28) return 'packing, utilities, and building logistics';
+  if (days <= 42) return 'booking, supplies, and renter documents';
+  return 'planning and quote-gathering';
+}
+
+function getCurrentPhaseProgress() {
+  const days = daysUntilMove();
+  const eligible = getEligiblePhases(AppEngine.TIMELINE_DATA_MATRIX, days);
+  const phase = eligible[0] || AppEngine.TIMELINE_DATA_MATRIX[0];
+  const items = phase ? phase.items : [];
+  const done = phase ? items.filter((_, i) => !!state.checked[phase.id + '-' + i]).length : 0;
+  return {
+    label: phase ? phase.label : 'Move plan',
+    done,
+    total: items.length,
+    remaining: Math.max(0, items.length - done)
+  };
+}
+
+function getCoachSummary() {
+  const days = Math.max(0, daysUntilMove());
+  const phase = getCurrentPhaseProgress();
+  const deadlines = getUpcomingDeadlines();
+  const overdueDeadlines = deadlines.filter(item => item.days < 0).length;
+  const dueThisWeek = deadlines.filter(item => item.days >= 0 && item.days <= 7).length;
+  const utilitiesDone = AppEngine.UTILITIES.filter(u => (state.utilities[u] || {}).status === 'done').length;
+  const packedRooms = AppEngine.ROOMS.filter(r => state.rooms[r] === 'Packed').length;
+  const boxes = state.boxes || [];
+  const openFirst = boxes.filter(box => box.openFirst && box.status !== 'unpacked').length;
+  const apartmentActions = needsApartmentHunt() ? getApartmentActionItems().length : 0;
+  const watch = [];
+
+  if (overdueDeadlines) watch.push(`${overdueDeadlines} overdue deadline${overdueDeadlines === 1 ? '' : 's'}`);
+  if (dueThisWeek) watch.push(`${dueThisWeek} deadline${dueThisWeek === 1 ? '' : 's'} due this week`);
+  if (phase.remaining) watch.push(`${phase.remaining} item${phase.remaining === 1 ? '' : 's'} left in ${phase.label}`);
+  if (needsApartmentHunt() && apartmentActions) watch.push(`${apartmentActions} apartment follow-up${apartmentActions === 1 ? '' : 's'}`);
+  if (days <= 21 && utilitiesDone < AppEngine.UTILITIES.length) watch.push(`${AppEngine.UTILITIES.length - utilitiesDone} utility setup item${AppEngine.UTILITIES.length - utilitiesDone === 1 ? '' : 's'}`);
+  if (days <= 14 && !openFirst) watch.push('no open-first box marked yet');
+  if (days <= 28 && packedRooms < AppEngine.ROOMS.length) watch.push(`${AppEngine.ROOMS.length - packedRooms} room${AppEngine.ROOMS.length - packedRooms === 1 ? '' : 's'} not packed`);
+
+  return {
+    stage: getStageName(days),
+    phase,
+    watch: watch.slice(0, 4),
+    status: watch.length
+      ? 'A few things are pulling for attention.'
+      : 'You are roughly where this plan expects you to be.'
+  };
+}
+
 function getTodaysFocus() {
   return getTodaysFocusItems()[0];
 }
@@ -729,11 +788,9 @@ function renderSidebar() {
   const done = doneTaskCount();
   const pct = total ? Math.round((done / total) * 100) : 0;
   const visibleSections = getVisibleAppSections();
-  const groupedSections = [
-    { title: 'Home', sections: visibleSections.filter(s => s.category === 'general') },
-    { title: 'Finding an Apartment', sections: visibleSections.filter(s => s.category === 'apartment') },
-    { title: 'Moving Out', sections: visibleSections.filter(s => s.category === 'moveout') }
-  ].filter(group => group.sections.length);
+  const groupedSections = ['Start Here', 'Work', 'Apartment', 'Reference']
+    .map(title => ({ title, sections: visibleSections.filter(s => s.navGroup === title) }))
+    .filter(group => group.sections.length);
   const profile = getMoveProfile();
   const profileLabel = [
     profile.moveStyle === 'diy' ? 'DIY move' : 'mover-assisted',
@@ -783,6 +840,7 @@ function dashboardCtx() {
     getApartmentActionItems,
     estimateSavings,
     getUpcomingDeadlines,
+    getCoachSummary,
     getGreeting,
     renderFocusDoneButton,
     getFunStat
@@ -1004,6 +1062,16 @@ function render() {
     </div>
   `;
   attachHandlers();
+  scrollActiveNavIntoView();
+}
+
+function scrollActiveNavIntoView() {
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
+  const activeNav = document.querySelector('.mt-nav [data-tab].active');
+  if (!activeNav || typeof activeNav.scrollIntoView !== 'function') return;
+  const scroll = () => activeNav.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(scroll);
+  else scroll();
 }
 
 function attachHandlers() {

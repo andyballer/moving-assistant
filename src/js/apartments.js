@@ -4,6 +4,9 @@ window.MovingApartments = (function() {
       name: 'StreetEasy',
       url: 'https://streeteasy.com/for-rent/nyc',
       supportsFilters: true,
+      rank: 1,
+      badge: 'Start here',
+      shortWhy: 'Best first pass for NYC 1BR inventory, filters, open houses, and base-rent comparisons.',
       bestFor: 'Main NYC search, building history, neighborhood filters, open houses, no-fee/base-rent comparisons.',
       timing: 'Check daily once you are inside 45 days; refresh saved searches morning, lunch, and late afternoon in the final 2 weeks.',
       tip: 'Save very specific searches by commute/neighborhood and cross-check the same building on Openigloo before touring.'
@@ -11,6 +14,9 @@ window.MovingApartments = (function() {
     {
       name: 'Openigloo',
       url: 'https://www.openigloo.com/',
+      rank: 2,
+      badge: 'Verify buildings',
+      shortWhy: 'Best second click before tours: landlord reviews, building issues, and rent-stabilized clues.',
       bestFor: 'Landlord/building reviews, verified listings, rent-stabilized and good-cause leads.',
       timing: 'Use before every serious tour or application, especially when a listing looks unusually cheap.',
       tip: 'Look for repeated complaints about heat, pests, repairs, packages, deposit behavior, and management responsiveness.'
@@ -18,6 +24,9 @@ window.MovingApartments = (function() {
     {
       name: 'NYC Housing Connect',
       url: 'https://housingconnect.nyc.gov/PublicWeb/',
+      rank: 4,
+      badge: 'Long game',
+      shortWhy: 'Best for affordable lotteries, but not a same-month replacement for market-rate search.',
       bestFor: 'Income-restricted affordable lotteries and waitlists.',
       timing: 'Apply continuously; it is usually a long-game channel, not a same-month rescue plan.',
       tip: 'Keep your profile and documents current so you can respond quickly if your log number comes up.'
@@ -25,6 +34,9 @@ window.MovingApartments = (function() {
     {
       name: 'Listings Project',
       url: 'https://www.listingsproject.com/',
+      rank: 3,
+      badge: 'Human leads',
+      shortWhy: 'Best for vetted community listings, sublets, and situations where a thoughtful note helps.',
       bestFor: 'Vetted community listings, sublets, rooms, creative/live-work spaces, and gentler owner-to-renter leads.',
       timing: 'Check the weekly drop quickly; good listings can disappear the same day.',
       tip: 'Best for Brooklyn/Manhattan community networks and flexible situations where a human note helps.'
@@ -142,6 +154,13 @@ window.MovingApartments = (function() {
     return parts.join(' · ');
   }
 
+  function getBedroomLabel(state) {
+    const beds = getBedroomCount(state);
+    if (beds === 0) return 'studios';
+    if (beds === 1) return '1 bedrooms';
+    return `${beds} bedrooms`;
+  }
+
   function guideFocusItem(ctx) {
     const { AppEngine, state } = ctx;
     for (const guide of (AppEngine.APT_HUNT_GUIDES || [])) {
@@ -245,30 +264,48 @@ window.MovingApartments = (function() {
   function renderSearchSources(ctx) {
     const { state, esc } = ctx;
     const searchSummary = getSearchSummary(state);
+    const primarySources = SEARCH_SOURCES
+      .filter(source => source.rank)
+      .sort((a, b) => a.rank - b.rank);
+    const otherSources = SEARCH_SOURCES.filter(source => !source.rank);
+    const sourceCard = (source, featured) => {
+      const url = source.url ? buildSourceUrl(source, ctx) : '';
+      return `
+        <div class="mt-source-card ${featured ? 'mt-source-card-featured' : ''}">
+          ${source.badge ? `<div class="mt-source-badge">${esc(source.badge)}</div>` : ''}
+          <div class="mt-source-title">
+            ${url
+              ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(source.name)}</a>`
+              : `<span>${esc(source.name)}</span>`}
+          </div>
+          ${source.shortWhy ? `<p class="mt-source-reason">${esc(source.shortWhy)}</p>` : `<p>${esc(source.bestFor)}</p>`}
+          ${source.supportsFilters && url ? `<div class="mt-source-meta"><strong>Link:</strong> prefilled from NYC, size, rent, and first neighborhood when supported.</div>` : ''}
+          <div class="mt-source-meta"><strong>When:</strong> ${esc(source.timing)}</div>
+          <div class="mt-source-meta"><strong>Tip:</strong> ${esc(source.tip)}</div>
+        </div>
+      `;
+    };
+
     return `
       <div class="mt-card mt-source-card-wrap">
         <div class="mt-card-header">
-          <h3>Where to search</h3>
+          <h3>Where to search first</h3>
           ${searchSummary ? `<span class="date-range">${esc(searchSummary)}</span>` : ''}
         </div>
         <div class="mt-card-body">
-          <div class="mt-source-grid">
-            ${SEARCH_SOURCES.map(source => {
-              const url = source.url ? buildSourceUrl(source, ctx) : '';
-              return `
-              <div class="mt-source-card">
-                <div class="mt-source-title">
-                  ${url
-                    ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(source.name)}</a>`
-                    : `<span>${esc(source.name)}</span>`}
-                </div>
-                <p>${esc(source.bestFor)}</p>
-                ${source.supportsFilters && url ? `<div class="mt-source-meta"><strong>Link:</strong> prefilled from NYC, size, rent, and first neighborhood when supported.</div>` : ''}
-                <div class="mt-source-meta"><strong>When:</strong> ${esc(source.timing)}</div>
-                <div class="mt-source-meta"><strong>Tip:</strong> ${esc(source.tip)}</div>
-              </div>
-            `; }).join('')}
+          <div class="mt-source-coach">
+            <strong>For NYC ${esc(getBedroomLabel(state))}, start with these.</strong>
+            <span>Use one main search, one building-review check, and one backup/community channel. Do not open ten tabs until the basics are covered.</span>
           </div>
+          <div class="mt-source-primary-grid">
+            ${primarySources.map(source => sourceCard(source, true)).join('')}
+          </div>
+          <details class="mt-source-more">
+            <summary>More backup sources</summary>
+          <div class="mt-source-grid">
+            ${otherSources.map(source => sourceCard(source, false)).join('')}
+          </div>
+          </details>
         </div>
       </div>
     `;

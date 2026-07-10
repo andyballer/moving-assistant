@@ -46,6 +46,7 @@ function renderAppWithState(savedState) {
     confirm() { return false; },
     setTimeout() {},
     location: { reload() {} },
+    URL,
     document: {
       body: { appendChild() {} },
       createElement() { return { ...noopElement, style: {} }; },
@@ -134,7 +135,10 @@ test('navigation tabs and state-valid tabs stay in sync', () => {
   const MovingApp = loadStateModule();
   const sectionIds = [...appJs.matchAll(/\{\s*id: '([^']+)'/g)].map((match) => match[1]);
 
-  assert.deepEqual(sectionIds, sameRealm(MovingApp.TAB_IDS));
+  assert.deepEqual(new Set(sectionIds), new Set(sameRealm(MovingApp.TAB_IDS)));
+  assert.equal(sectionIds[0], 'dashboard');
+  assert.match(appJs, /navGroup: 'Start Here'/);
+  assert.match(appJs, /navGroup: 'Reference'/);
 });
 
 test('default state has the expected core shape', () => {
@@ -180,7 +184,48 @@ test('sanitizeState migrates older apartment and box data', () => {
   assert.equal(sanitized.apartments[0].status, 'Viewed');
   assert.deepEqual(sameRealm(sanitized.boxes[0].contents), ['mugs', 'plates']);
   assert.equal(sanitized.boxes[0].status, 'packed');
+  assert.equal(sanitized.boxes[0].source, '');
+  assert.equal(sanitized.boxes[0].sourceKey, '');
+  assert.equal(sanitized.recentlyRemovedBox, null);
   assert.deepEqual(sameRealm(sanitized.moverTip), { crewSize: 12, hours: 1, rate: 50, service: 'good' });
+});
+
+test('box inventory can undo untouched suggested boxes', () => {
+  const MovingApp = loadStateModule();
+  const suggestion = MovingApp.DEFAULT_BOX_PLAN[0];
+  const html = renderAppWithState({
+    schemaVersion: MovingApp.SCHEMA_VERSION,
+    userName: 'Test',
+    targetMoveDate: '2026-08-15',
+    aptSize: '1br',
+    activeTab: 'boxes',
+    moveProfile: { apartmentHunt: false, moveStyle: 'movers', buildingType: 'apartment' },
+    boxes: [{
+      id: 'suggested-older-box',
+      label: suggestion.label,
+      room: suggestion.room,
+      contents: suggestion.contents,
+      fragile: !!suggestion.fragile,
+      openFirst: !!suggestion.openFirst,
+      status: 'packed'
+    }]
+  });
+  assert.match(html, /Undo 1 suggested box/);
+});
+
+test('box inventory deletion uses inline undo instead of modal copy', () => {
+  const MovingApp = loadStateModule();
+  const html = renderAppWithState({
+    schemaVersion: MovingApp.SCHEMA_VERSION,
+    userName: 'Test',
+    targetMoveDate: '2026-08-15',
+    aptSize: '1br',
+    activeTab: 'boxes',
+    recentlyRemovedBox: { id: 'removed-1', label: 'Box 1', room: 'Bedroom', contents: ['Sweaters'], status: 'packed' }
+  });
+  assert.match(html, /Removed Box 1/);
+  assert.match(html, /mt-box-undo-remove/);
+  assert.doesNotMatch(read('src/js/boxes.js'), /Remove this box from the inventory/);
 });
 
 test('sanitizeState normalizes move profile applicability fields', () => {
@@ -248,17 +293,17 @@ test('profile applicability hides irrelevant navigation and redirects stale tabs
   };
   const dashboardHtml = renderAppWithState(baseState);
 
-  assert.doesNotMatch(dashboardHtml, /Apartment Hunt/);
-  assert.doesNotMatch(dashboardHtml, /Apartment Tracker/);
+  assert.doesNotMatch(dashboardHtml, /data-tab="aptsearch"/);
+  assert.doesNotMatch(dashboardHtml, /data-tab="apartments"/);
   assert.doesNotMatch(dashboardHtml, />Movers</);
-  assert.match(dashboardHtml, /Dashboard/);
+  assert.match(dashboardHtml, /Today/);
 
   const staleApartmentHtml = renderAppWithState({ ...baseState, activeTab: 'aptsearch' });
-  assert.match(staleApartmentHtml, /Dashboard/);
+  assert.match(staleApartmentHtml, /Today/);
   assert.doesNotMatch(staleApartmentHtml, /Search setup/);
 
   const staleMoversHtml = renderAppWithState({ ...baseState, activeTab: 'movers' });
-  assert.match(staleMoversHtml, /Dashboard/);
+  assert.match(staleMoversHtml, /Today/);
   assert.doesNotMatch(staleMoversHtml, /Mover tipping guide/);
 });
 
@@ -340,6 +385,30 @@ test('dashboard surfaces upcoming deadline chips from existing dates', () => {
   assert.match(html, /Move day/);
   assert.match(html, /First 24-hour home check/);
   assert.match(html, /First week closeout/);
+  assert.match(html, /Where you should be/);
+  assert.match(html, /Outstanding/);
+  assert.match(html, /Next 10-minute win/);
+});
+
+test('apartment search ranks sources instead of presenting a flat list', () => {
+  const html = renderAppWithState({
+    schemaVersion: 13,
+    userName: 'Test',
+    targetMoveDate: '2026-08-15',
+    aptSize: '1br',
+    activeTab: 'aptsearch',
+    moveProfile: { apartmentHunt: true, moveStyle: 'movers', buildingType: 'apartment' },
+    targetBudgetMin: '3000',
+    targetBudgetMax: '4500',
+    neighborhoods: ['Astoria']
+  });
+
+  assert.match(html, /Where to search first/);
+  assert.match(html, /For NYC 1 bedrooms, start with these/);
+  assert.match(html, /Start here/);
+  assert.match(html, /StreetEasy/);
+  assert.match(html, /Openigloo/);
+  assert.match(html, /More backup sources/);
 });
 
 test('move day includes first-week follow-up checklist', () => {

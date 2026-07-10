@@ -553,6 +553,7 @@ window.MovingApp.defaultState = function() {
     boxSearch: '',
     boxStatusFilter: 'all',
     editingBoxId: '',
+    recentlyRemovedBox: null,
     rooms: window.MovingApp.ROOMS.reduce((acc, r) => ({ ...acc, [r]: 'Not started' }), {}),
     roomChecklist: {},
     utilities: window.MovingApp.UTILITIES.reduce((acc, u) => ({ ...acc, [u]: {
@@ -666,11 +667,24 @@ window.MovingApp.sanitizeState = function(input) {
     contents: Array.isArray(box.contents) ? box.contents.map(String) : String(box.contents || '').split(',').map(x => x.trim()).filter(Boolean),
     fragile: !!box.fragile,
     openFirst: !!box.openFirst,
-    status: ['packed', 'loaded', 'arrived', 'unpacked'].includes(box.status) ? box.status : 'packed'
+    status: ['packed', 'loaded', 'arrived', 'unpacked'].includes(box.status) ? box.status : 'packed',
+    source: typeof box.source === 'string' ? box.source : '',
+    sourceKey: typeof box.sourceKey === 'string' ? box.sourceKey : ''
   })) : [];
   merged.boxSearch = typeof input.boxSearch === 'string' ? input.boxSearch : '';
   merged.boxStatusFilter = ['all', 'open-first', 'fragile', 'packed', 'loaded', 'arrived', 'unpacked'].includes(input.boxStatusFilter) ? input.boxStatusFilter : 'all';
   merged.editingBoxId = typeof input.editingBoxId === 'string' ? input.editingBoxId : '';
+  merged.recentlyRemovedBox = input.recentlyRemovedBox && typeof input.recentlyRemovedBox === 'object' ? {
+    id: input.recentlyRemovedBox.id || ('box-removed-' + Date.now()),
+    label: input.recentlyRemovedBox.label || 'Removed box',
+    room: input.recentlyRemovedBox.room || 'Unassigned',
+    contents: Array.isArray(input.recentlyRemovedBox.contents) ? input.recentlyRemovedBox.contents.map(String) : String(input.recentlyRemovedBox.contents || '').split(',').map(x => x.trim()).filter(Boolean),
+    fragile: !!input.recentlyRemovedBox.fragile,
+    openFirst: !!input.recentlyRemovedBox.openFirst,
+    status: ['packed', 'loaded', 'arrived', 'unpacked'].includes(input.recentlyRemovedBox.status) ? input.recentlyRemovedBox.status : 'packed',
+    source: typeof input.recentlyRemovedBox.source === 'string' ? input.recentlyRemovedBox.source : '',
+    sourceKey: typeof input.recentlyRemovedBox.sourceKey === 'string' ? input.recentlyRemovedBox.sourceKey : ''
+  } : null;
   merged.contacts = input.contacts && typeof input.contacts === 'object' ? {
     movers: input.contacts.movers || '',
     doorman: input.contacts.doorman || '',

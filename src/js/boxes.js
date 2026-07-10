@@ -9,7 +9,9 @@ window.MovingBoxes = (function() {
       contents: Array.isArray(suggestion.contents) ? [...suggestion.contents] : [],
       fragile: !!suggestion.fragile,
       openFirst: !!suggestion.openFirst,
-      status: 'packed'
+      status: 'packed',
+      source: 'suggested-plan',
+      sourceKey: getSuggestedBoxKey(suggestion)
     };
   }
 
@@ -17,10 +19,40 @@ window.MovingBoxes = (function() {
     return `${(suggestion.label || '').toLowerCase()}|${(suggestion.room || '').toLowerCase()}`;
   }
 
+  function normalizeContents(contents) {
+    return (Array.isArray(contents) ? contents : String(contents || '').split(','))
+      .map(item => String(item || '').trim())
+      .filter(Boolean);
+  }
+
+  function hasSameContents(box, suggestion) {
+    const boxContents = normalizeContents(box.contents);
+    const suggestionContents = normalizeContents(suggestion.contents);
+    return boxContents.length === suggestionContents.length
+      && boxContents.every((item, idx) => item === suggestionContents[idx]);
+  }
+
+  function isUndoableSuggestedBox(box, suggestionsByKey) {
+    const sourceKey = box.sourceKey || getSuggestedBoxKey(box);
+    const suggestion = suggestionsByKey.get(sourceKey);
+    if (!suggestion) return false;
+    if (box.source === 'suggested-plan' && box.sourceKey === sourceKey) return true;
+    return getSuggestedBoxKey(box) === sourceKey
+      && hasSameContents(box, suggestion)
+      && !!box.fragile === !!suggestion.fragile
+      && !!box.openFirst === !!suggestion.openFirst;
+  }
+
+  function getUndoableSuggestedBoxes(ctx) {
+    const suggestionsByKey = new Map((ctx.AppEngine.DEFAULT_BOX_PLAN || []).map(suggestion => [getSuggestedBoxKey(suggestion), suggestion]));
+    return (ctx.state.boxes || []).filter(box => isUndoableSuggestedBox(box, suggestionsByKey));
+  }
+
   function renderBoxPlan(ctx) {
     const { AppEngine, state, esc } = ctx;
     const plan = AppEngine.DEFAULT_BOX_PLAN || [];
     const used = new Set((state.boxes || []).map(getSuggestedBoxKey));
+    const undoableCount = getUndoableSuggestedBoxes(ctx).length;
     return `
       <div class="mt-card mt-box-plan-card">
         <div class="mt-card-header">
@@ -28,7 +60,10 @@ window.MovingBoxes = (function() {
             <h3>Suggested packing order</h3>
             <p class="mt-muted-copy" style="margin:4px 0 0;">Start with what you will not need for weeks. Kitchen daily-use boxes wait until later.</p>
           </div>
-          <button class="mt-secondary-btn" id="mt-box-add-plan">Add all missing</button>
+          <div class="mt-box-plan-actions">
+            <button class="mt-secondary-btn" id="mt-box-add-plan">Add all missing</button>
+            ${undoableCount ? `<button class="mt-secondary-btn mt-secondary-btn-danger" id="mt-box-undo-plan">Undo ${undoableCount} suggested box${undoableCount === 1 ? '' : 'es'}</button>` : ''}
+          </div>
         </div>
         <div class="mt-box-plan-list">
           ${plan.map((suggestion, i) => {
@@ -107,6 +142,12 @@ window.MovingBoxes = (function() {
       <div class="mt-alert-box">
         <strong>Packing order:</strong> Box 1 should be off-season closet stuff, not daily kitchen gear. Kitchen basics and open-first boxes belong much closer to move week.
       </div>
+      ${state.recentlyRemovedBox ? `
+        <div class="mt-box-undo-banner">
+          <span>Removed ${esc(state.recentlyRemovedBox.label || 'box')}.</span>
+          <button class="mt-mini-action" id="mt-box-undo-remove">Undo</button>
+        </div>
+      ` : ''}
       <div class="mt-dashboard-metrics" style="margin-bottom:16px;">
         <div class="mt-card" style="padding:16px; margin:0; text-align:center;"><div class="mt-box-big">${allBoxes.length}</div><div class="mt-metric-label">Total boxes</div></div>
         <div class="mt-card" style="padding:16px; margin:0; text-align:center;"><div class="mt-box-big">${counts['open-first']}</div><div class="mt-metric-label">Open first</div></div>
@@ -205,6 +246,17 @@ window.MovingBoxes = (function() {
       });
     }
 
+    const undoPlanBtn = root.querySelector('#mt-box-undo-plan');
+    if (undoPlanBtn) {
+      undoPlanBtn.addEventListener('click', () => {
+        const undoIds = new Set(getUndoableSuggestedBoxes(ctx).map(box => box.id));
+        if (!undoIds.size) return;
+        state.boxes = (state.boxes || []).filter(box => !undoIds.has(box.id));
+        AppEngine.saveState(state);
+        render();
+      });
+    }
+
     const boxAddBtn = root.querySelector('#mt-box-add');
     if (boxAddBtn) {
       boxAddBtn.addEventListener('click', () => {
@@ -284,12 +336,29 @@ window.MovingBoxes = (function() {
     root.querySelectorAll('[data-box-remove]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-box-remove');
-        if (!confirm('Remove this box from the inventory?')) return;
+        const removed = (state.boxes || []).find(b => b.id === id);
+        if (!removed) return;
+        state.recentlyRemovedBox = { ...removed };
         state.boxes = (state.boxes || []).filter(b => b.id !== id);
+        if (state.editingBoxId === id) state.editingBoxId = '';
         AppEngine.saveState(state);
         render();
       });
     });
+
+    const undoRemoveBtn = root.querySelector('#mt-box-undo-remove');
+    if (undoRemoveBtn) {
+      undoRemoveBtn.addEventListener('click', () => {
+        if (!state.recentlyRemovedBox) return;
+        if (!state.boxes) state.boxes = [];
+        if (!state.boxes.some(box => box.id === state.recentlyRemovedBox.id)) {
+          state.boxes.push({ ...state.recentlyRemovedBox });
+        }
+        state.recentlyRemovedBox = null;
+        AppEngine.saveState(state);
+        render();
+      });
+    }
 
     root.querySelectorAll('[data-box-drag-id]').forEach(card => {
       card.addEventListener('dragstart', (e) => {
@@ -318,6 +387,7 @@ window.MovingBoxes = (function() {
 
   return {
     attachHandlers,
+    getUndoableSuggestedBoxes,
     getSuggestedBoxKey,
     renderBoxes
   };

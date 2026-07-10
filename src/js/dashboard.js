@@ -20,6 +20,7 @@ window.MovingDashboard = (function() {
       getApartmentActionItems,
       estimateSavings,
       getUpcomingDeadlines,
+      getCoachSummary,
       getGreeting,
       renderFocusDoneButton,
       getFunStat
@@ -41,6 +42,7 @@ window.MovingDashboard = (function() {
     const secondaryFocus = focusItems.slice(1);
     const upcomingDeadlines = getUpcomingDeadlines();
     const deadlineGroups = getDeadlineGroups(upcomingDeadlines);
+    const coach = getCoachSummary();
     const signalCards = [
       { label: 'Rooms packed', value: `${packedRooms}/${AppEngine.ROOMS.length}`, tab: 'rooms' },
       { label: 'Boxes logged', value: boxCount, tab: 'boxes' },
@@ -56,9 +58,25 @@ window.MovingDashboard = (function() {
           <h1>${getGreeting()}, ${esc(state.userName || 'friend')} 👋</h1>
           <p>${days <= 7 ? 'Home stretch. We are making this annoyingly manageable.' : 'One small win at a time. Cardboard fears you.'}</p>
 
+          <div class="mt-coach-panel">
+            <div class="mt-coach-main">
+              <span class="mt-command-label">Where you should be</span>
+              <strong>${days} day${days === 1 ? '' : 's'} left: ${esc(coach.stage)}</strong>
+              <p>${esc(coach.status)} Current phase: ${esc(coach.phase.label)} (${coach.phase.done}/${coach.phase.total} done).</p>
+            </div>
+            <div class="mt-coach-watch">
+              <span class="mt-command-label">Outstanding</span>
+              ${coach.watch.length ? `
+                <ul>${coach.watch.map(item => `<li>${esc(item)}</li>`).join('')}</ul>
+              ` : `
+                <p>No major gaps flagged right now.</p>
+              `}
+            </div>
+          </div>
+
           <div class="mt-command-grid">
             <section class="mt-primary-action">
-              <div class="mt-command-label">Do next</div>
+              <div class="mt-command-label">Next 10-minute win</div>
               <button class="mt-primary-action-main" data-focus-open="${esc(primaryFocus.tab)}">
                 <span>${esc(primaryFocus.text)}</span>
                 <small>${esc(primaryFocus.phase)}</small>
