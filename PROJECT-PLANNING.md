@@ -4,68 +4,64 @@
 
 This is the living planning file for the project. It should help Codex act as a high-quality engineer/PM partner, not just store a list of ideas.
 
+
+
+
 ## Handoff Snapshot (2026-07-09 End Of Chat)
 
-Use this section as the next chat's starting point. Last committed checkpoint is `7cb7eef Improve moving assistant workflow modules` on `main`. Everything below is implemented and verified locally but **not committed yet**.
+## Handoff Snapshot (2026-07-09, planning session)
 
-Current uncommitted product work:
+Use this section as the next session's starting point. Last committed checkpoint is `886a9f3 Turn dashboard into a guided coach, simplify nav, rank apartment sources` on `main`. Working tree is clean except `.DS_Store` / `src/.DS_Store` (leave alone).
 
-- Dashboard now behaves more like a guided coach:
-  - Left nav entry is `Today`, not `Dashboard`.
-  - Dashboard shows `Where you should be`, current stage, current timeline phase progress, outstanding gaps, and a `Next 10-minute win`.
-  - Dashboard still has secondary `Up next`, status signal cards, deadline chips, progress, and export calendar.
-- Navigation is simplified into four groups:
-  - `Start Here`: Today
-  - `Work`: Timeline, Rooms, Boxes, Utilities
-  - `Apartment`: Search, Tracker
-  - `Reference`: Move Day, Supplies, Movers, Costs
-  - Mobile menu mirrors this grouping.
-- Apartment Search now recommends where to click first instead of showing a flat list:
-  - StreetEasy = primary NYC 1BR inventory/search
-  - Openigloo = building/landlord verification before tours
-  - Listings Project = community/sublet/human leads
-  - NYC Housing Connect = affordable-housing long game
-  - Secondary sources are hidden under `More backup sources`.
-- Box Inventory has safer undo behavior:
-  - Suggested-plan boxes get `source: 'suggested-plan'` and `sourceKey`.
-  - Older untouched suggested boxes can be undone via `Undo suggested boxes`.
-  - Per-box delete confirmation modal was removed; deleting now shows an inline `Removed ... Undo` banner.
-  - `state.recentlyRemovedBox` is sanitized/preserved so the inline undo survives render/save.
-- Sidebar active item scrolls into view after render/dashboard jumps.
-- Service worker cache is bumped to `moving-assistant-v61`.
-- `CHANGELOG-UPDATES.txt` already records the latest work.
+Apartment search status: still early/browsing, not yet touring. This means borough-depth work (item 2 below) has limited payoff right now since the target area (Gramercy/Flatiron/Murray Hill) is already fixed to Manhattan — revisit its priority once touring/applications start or if other boroughs enter consideration.
 
-Verification already run after the latest changes:
+**Decision this session: local reminders (old item 3, Notifications API) are backlogged, not next.** The app is currently used as a browser tab, not installed to the home screen. iOS Safari (and most browsers to varying degrees) requires a PWA to be installed before the Notifications API works at all — building this now would likely ship a feature that silently never fires. Revisit once the app is actually installed as a PWA, or if that changes.
 
-- `npm test` passed: 20/20
-- `npm run check:js` passed
-- Browser smoke check was done with a temporary cache-busted localhost harness because the in-app browser held onto an older service-worker shell:
-  - Confirmed new Dashboard coach UI renders.
-  - Confirmed simplified nav groups render.
-  - Confirmed Apartment Search ranked source panel renders.
-  - Temporary harness was deleted; local servers were stopped.
+**Two concrete bugs were found this session and need fixing first, before new feature work. Full instructions below.**
 
-Current dirty files expected after this handoff:
+### Bug 1: Box Inventory "Removed ... Undo" banner never goes away on its own
 
-- `CHANGELOG-UPDATES.txt`
-- `PROJECT-PLANNING.md`
-- `src/css/style.css`
-- `src/js/apartments.js`
-- `src/js/app.js`
-- `src/js/boxes.js`
-- `src/js/dashboard.js`
-- `src/js/state.js`
-- `sw.js`
-- `test/smoke.test.js`
-- `.DS_Store` and `src/.DS_Store` are also dirty; leave them alone unless the user explicitly asks.
+`state.recentlyRemovedBox` is set when a box is deleted (`boxes.js`, the `[data-box-remove]` click handler) so an inline "Removed [box]. Undo" banner can show. The bug: it is persisted like real data and rehydrated on every load, so it survives page refresh, reopening the tab, and importing an old backup — it can sit there indefinitely until the user happens to click Undo or delete a different box.
+
+**Fix instructions:**
+
+1. In `src/js/state.js`, leave `sanitizeState()`'s existing handling of `recentlyRemovedBox` alone — do not remove or null it there. (Reason: `saveState()` calls `sanitizeState()` on every save, so nulling it in the sanitizer would break the banner even within the same session, before it ever renders.)
+2. In `src/js/state.js`, inside `loadState()`, right after `const migrated = window.MovingApp.sanitizeState(JSON.parse(saved));`, add a line that sets `migrated.recentlyRemovedBox = null;` before the function returns `migrated`. This clears it specifically on a fresh app boot from storage, without touching the same-session save/render round trip.
+3. In `src/js/app.js`, find the backup-import handler (search for `state = AppEngine.sanitizeState(parsed);`). Immediately after that line, add `state.recentlyRemovedBox = null;` before `AppEngine.saveState(state);`. Reason: importing an old backup shouldn't replay whatever "just removed" banner existed at the moment that backup was taken.
+4. In `src/js/boxes.js`, add an explicit dismiss control next to the existing "Undo" button in the banner markup (the block starting `${state.recentlyRemovedBox ? ...}` inside `renderBoxes()`). Wrap "Undo" and a new "×" dismiss button together in a small `<span class="mt-box-undo-banner-actions">` wrapper. Give the dismiss button `id="mt-box-dismiss-remove"`.
+5. Also in `src/js/boxes.js`, add an 8-second auto-dismiss timer: at the top of the module (inside the `window.MovingBoxes = (function() { ... })()` IIFE, before any function declarations), add a module-level `let undoBannerTimeout = null;` and a small helper `clearUndoBannerTimeout()` that clears and nulls it if set. In the `[data-box-remove]` click handler, after `render()` is called, call `clearUndoBannerTimeout()` then schedule a new `setTimeout` (8000ms) that — only if `state.recentlyRemovedBox` still matches the id that was just removed — nulls it, saves, and re-renders. In both the "Undo" click handler and the new dismiss button's click handler, call `clearUndoBannerTimeout()` before doing anything else, so a stale timer can't fire after the user has already acted.
+6. In `src/css/style.css`, add matching styles: a `.mt-box-undo-banner-actions` flex wrapper (small gap, align-items center) and a `.mt-mini-action-dismiss` style — reuse the existing `.mt-mini-action` look but muted/borderless (transparent background/border, muted text color, small padding, `font-size: 15px` for the × character), with a subtle hover background.
+7. Bump `CACHE_VERSION` in `sw.js` by one, since `state.js`, `app.js`, `boxes.js`, and `style.css` all changed.
+8. Update `test/smoke.test.js`: the existing test `box inventory deletion uses inline undo instead of modal copy` currently seeds `recentlyRemovedBox` through the full saved-state boot path (`renderAppWithState`) and expects the banner to render — that will now correctly fail, since fix step 2 clears it on boot. Split it into two tests:
+   - One that renders `MovingBoxes.renderBoxes(ctx)` **directly** (bypassing the full app boot / `loadState`), passing a minimal `ctx` with `{ AppEngine, esc, state: { boxes: [], recentlyRemovedBox: {...} } }`, and asserts the banner markup (`Removed Box 1`, `mt-box-undo-remove`, `mt-box-dismiss-remove`) is present. This tests the render function in isolation, independent of persistence.
+   - A new test that seeds `recentlyRemovedBox` into saved state, boots the full app via `renderAppWithState`, and asserts the banner does **not** appear in the rendered HTML — proving the fix.
+9. Log the fix in `CHANGELOG-UPDATES.txt` under a new dated entry once implemented and verified.
+10. Verify with `npm test` and `npm run check:js` before considering this done.
+
+### Bug 2: Mobile nav menu doesn't actually match desktop's four-group model
+
+See `Code Audit Findings (2026-07-09)` below and `Next / Planned Work` item 8 for full detail and fix instructions.
+
+**Priority order for this session: fix Bug 1, then Bug 2 (item 8), then item 1 (snooze/not-relevant), then item 2 (borough depth) if time remains.**
+
+1. **Snooze / not-relevant controls for focus items** (`Next / Planned Work` item 4, sub-bullet). Concrete plan:
+   - `getTodaysFocusItems()` in `app.js` (~line 585) currently rebuilds a fresh, unkeyed list every render (dedupe key today is `text + '|' + tab`, which changes whenever counts in the text change — not stable enough to persist a dismissal against).
+   - Give each focus item a **stable `id`** independent of its display text, e.g. `'move-week-essentials'`, `'timeline-phase'`, `'apartment-hunt'`, `'apartment-tracker'`, `'box'`, `'utility'`, `'room'`, `'backup'`. These map 1:1 to the existing `items.push(...)` call sites in `getTodaysFocusItems()`.
+   - Add `state.dismissedFocusItems` (object keyed by that stable `id`, value `{ mode: 'snoozed' | 'not-relevant', until: <ISO date or null> }`). Add defaults + sanitization in `state.js` alongside the existing `moveProfile` sanitization pattern.
+   - Filter dismissed items out of `getTodaysFocusItems()`'s return before the `.slice(0, 3)`, respecting `until` for snoozed items (auto-reappear once passed) and permanently hiding `not-relevant` ones.
+   - UI: small dismiss affordance on each Dashboard focus card — reuse the inline "Removed ... Undo" banner pattern from Bug 1 above rather than a new modal pattern.
+   - Needs test coverage: a snoozed item disappears until its date, a not-relevant item never reappears, dismissing one item doesn't affect others' stable ids.
+
+2. **Borough-level NYC depth** (`Next / Planned Work` item 2). Lower urgency than item 1 given "still browsing" status above, but next in line. Concrete plan:
+   - Add `moveProfile.borough` (`'manhattan' | 'brooklyn' | 'queens' | 'bronx' | 'staten-island'`) following the exact pattern of `apartmentHunt`/`moveStyle` in `state.js` (~line 538 defaults, ~line 612 sanitization).
+   - Only ship if it visibly changes advice on day one — strongest candidates per `NYC Depth Strategy`: alternate-side-parking/truck-loading rules and building-type mix (walk-up vs elevator prevalence).
+   - Label the built-in `MOVERS` list (`state.js`) as Manhattan/close-borough-biased if borough is added, so non-Manhattan users aren't misled.
+   - Source any borough-specific legal/permit claims from NYC.gov/DOB/DSNY before shipping copy — do not generalize from memory.
 
 Good next steps for the next chat:
-
-- Re-run `git status --short`, `npm test`, and `npm run check:js`.
-- Optionally do one more browser pass after clearing/updating the service worker cache.
-- Review the uncommitted diff for any copy/style polish.
-- Commit the intentional files if the user wants a checkpoint; do not stage `.DS_Store`.
-- Next product direction: continue reducing tab-hunting by making Dashboard actions more directly completable, then consider snooze/not-relevant states for focus items.
+- Re-run `git status --short`, `npm test`, and `npm run check:js` to confirm nothing drifted since this snapshot.
+- Fix Bug 1 and Bug 2 first — both are small, self-contained, and high-confidence.
+- Keep changes small and verified per increment, per `Operating Principles`.
 
 ## How To Use This File
 
@@ -103,6 +99,21 @@ Read against the actual source (`state.js`, `app.js`, `apartments.js`, `movers.j
 - **Test coverage is genuinely solid where it exists** (compile checks, script order, cache completeness, tab/state sync, migration, backup summaries — 8 passing tests) **but has zero coverage of applicability/hide-show behavior**, confirming the plan's existing item 9 precisely.
 - **Escaping discipline looks solid on spot-check** — box labels/contents and apartment notes are consistently passed through `esc()` before interpolation. No action needed; noted here so it doesn't get re-audited from scratch.
 - Default neighborhoods (`Gramercy`, `Flatiron`, `Murray Hill`) are your own search area. Fine as a personal default; worth a deliberate decision later on whether that stays personal or becomes a generic new-user seed once/if this is ever shared beyond one person.
+
+## Code Audit Findings (2026-07-09)
+
+Full read of the `886a9f3` diff (`app.js`, `dashboard.js`, `apartments.js`, `boxes.js`) plus a scan for similar patterns elsewhere. Two real findings.
+
+- **Bug 1 (Box Inventory undo banner persistence)** — see `Handoff Snapshot` for full fix instructions.
+
+- **Bug 2: mobile nav menu does not actually mirror the desktop four-group model, despite the `886a9f3` commit message claiming it does.** `appSections` (`app.js` ~line 13) now carries two parallel classification fields per item: the old `category` (`'general' | 'apartment' | 'moveout'`) and the new `navGroup` (`'Start Here' | 'Work' | 'Apartment' | 'Reference'`). `renderSidebar()` (desktop) uses `navGroup` exclusively. `openMobileMenu()` uses a mix: `category` for the top "general row" and the "Finding an Apartment" column, `navGroup` only for the Work/Reference columns.
+  - Concrete effect: `savings` (labeled "Costs") has `category: 'general'` but `navGroup: 'Reference'`. On desktop it's grouped with Move Day/Supplies/Movers at the bottom of "Reference." On mobile it renders in the top `.mt-general-row` — a visually separate, more prominent block above all four grouped columns — right next to "Today." Same nav item, meaningfully different prominence depending on platform.
+  - Mobile column headings also don't match desktop's new group names ("🔑 Finding an Apartment" vs desktop's "Apartment"), another small leftover from before the rename.
+  - Risk going forward: any new section needs `category` and `navGroup` set consistently across two mental models, or it'll render correctly on one platform and wrong (or missing) on the other.
+  - The existing test (`navigation tabs and state-valid tabs stay in sync`, `test/smoke.test.js`) only regex-matches that the literal strings `navGroup: 'Start Here'` and `navGroup: 'Reference'` appear somewhere in `app.js`. It never renders `openMobileMenu()` or checks that mobile grouping actually matches desktop — it would pass today despite this bug.
+  - **Fix instructions:** Retire `category` as a grouping field entirely; use `navGroup` as the single source of truth for both desktop and mobile. In `openMobileMenu()`, replace the `generalSecs`/`aptSecs` filters (which use `category`) with `navGroup`-based filters matching desktop's four groups exactly, including matching group titles/headings word-for-word. Decide deliberately whether "Today" (and possibly "Costs") should keep a visually separate, more prominent top row — if so, gate that specifically by `id === 'dashboard'`, not by a semi-redundant `category` field, and apply the same visual treatment on desktop if it's meant to be consistent. Add a real test: call the mobile-menu render path directly (similar to how `MovingBoxes.renderBoxes()` can be called directly for isolated testing) and assert that every item's rendered group matches its `navGroup` value, for both desktop and mobile.
+
+- **Minor, not a bug, worth a deliberate decision:** `state.editingBoxId` (Box Inventory) persists across reload — if you're mid-edit on a box and refresh, it reopens that box's edit form. Unlike `recentlyRemovedBox`, this doesn't grow stale or misleading over time (it just points at a still-real box), so it's a legitimate UX choice either way. Flagging so it's an intentional choice, not an accidental side effect of the same pattern that caused Bug 1.
 
 ## Roadmap
 
@@ -344,6 +355,13 @@ Full history lives in `CHANGELOG-UPDATES.txt` and git history — not duplicated
 7. Build an applicability engine once a third profile field gates content.
    - Today `apartmentHunt` and `moveStyle` each gate visibility with their own conditional. Once another field gates content, replace the scattered `if` checks with one function that takes the Move Profile and returns which tabs/sections apply.
    - Do this refactor right when the third gate lands, not before — two conditionals don't yet justify the abstraction.
+
+8. Fix mobile nav grouping to actually match desktop (found in `Code Audit Findings (2026-07-09)`).
+   - Retire `category` as a grouping field; use `navGroup` as the single source of truth on both desktop and mobile.
+   - Match mobile column headings to desktop group names exactly (e.g. "Finding an Apartment" vs "Apartment").
+   - Deliberately decide whether "Costs" should be prominent (current mobile behavior — pinned in the top row) or reference-tier (current desktop behavior — bottom of Reference group). Don't leave it silently different by device.
+   - Add real render-level test coverage: call the mobile-menu render path directly and assert group membership, rather than the current test's regex-only substring check.
+   - Small, self-contained, high-confidence fix. Good candidate to do first next session.
 
 ## Sleek & Fun — Identity Ideas
 

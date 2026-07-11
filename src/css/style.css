@@ -844,6 +844,9 @@ body {
 .mt-box-card select { width: 100%; }
 .mt-drag-handle { color: var(--text-muted); cursor: grab; font-size: 14px; letter-spacing: -3px; padding-right: 2px; }
 .mt-box-undo-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: -6px 0 16px; padding: 10px 12px; border: 1px solid rgba(0,122,255,0.16); border-radius: 10px; background: rgba(0,122,255,0.05); color: var(--text-main); font-size: 13px; font-weight: 700; }
+.mt-box-undo-banner-actions { display: flex; align-items: center; gap: 5px; }
+.mt-mini-action-dismiss { border-color: transparent; background: transparent; color: var(--text-muted); padding: 3px 7px; font-size: 15px; }
+.mt-mini-action-dismiss:hover { background: rgba(0,0,0,0.05); }
 .mt-box-plan-card .mt-card-header { align-items: flex-start; gap: 12px; }
 .mt-box-plan-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .mt-box-plan-list { display: flex; flex-direction: column; gap: 10px; padding: 14px 20px 18px; }

@@ -6,21 +6,18 @@ if (!state.activeTab) {
   AppEngine.saveState(state);
 }
 
-// Global Definitions for Mobile Grid Bubble Mapping Matrix
-// category: 'general' shows above the two columns; 'apartment' = finding a new place;
-// 'moveout' = moving out of the current place.
 const appSections = [
-  { id: 'dashboard', label: 'Today', icon: '🏠', category: 'general', navGroup: 'Start Here' },
-  { id: 'tasks', label: 'Timeline', icon: '📋', category: 'moveout', navGroup: 'Work' },
-  { id: 'rooms', label: 'Rooms', icon: '🧳', category: 'moveout', navGroup: 'Work' },
-  { id: 'boxes', label: 'Boxes', icon: '🏷️', category: 'moveout', navGroup: 'Work' },
-  { id: 'addressutil', label: 'Utilities', icon: '⚡', category: 'moveout', navGroup: 'Work' },
-  { id: 'aptsearch', label: 'Search', icon: '🔍', category: 'apartment', navGroup: 'Apartment' },
-  { id: 'apartments', label: 'Tracker', icon: '🏢', category: 'apartment', navGroup: 'Apartment' },
-  { id: 'dayof', label: 'Move Day', icon: '🎯', category: 'moveout', navGroup: 'Reference' },
-  { id: 'supplies', label: 'Supplies', icon: '📦', category: 'moveout', navGroup: 'Reference' },
-  { id: 'movers', label: 'Movers', icon: '🚛', category: 'moveout', navGroup: 'Reference' },
-  { id: 'savings', label: 'Costs', icon: '💵', category: 'general', navGroup: 'Reference' }
+  { id: 'dashboard', label: 'Today', icon: '🏠', navGroup: 'Start Here' },
+  { id: 'tasks', label: 'Timeline', icon: '📋', navGroup: 'Work' },
+  { id: 'rooms', label: 'Rooms', icon: '🧳', navGroup: 'Work' },
+  { id: 'boxes', label: 'Boxes', icon: '🏷️', navGroup: 'Work' },
+  { id: 'addressutil', label: 'Utilities', icon: '⚡', navGroup: 'Work' },
+  { id: 'aptsearch', label: 'Search', icon: '🔍', navGroup: 'Apartment' },
+  { id: 'apartments', label: 'Tracker', icon: '🏢', navGroup: 'Apartment' },
+  { id: 'dayof', label: 'Move Day', icon: '🎯', navGroup: 'Reference' },
+  { id: 'supplies', label: 'Supplies', icon: '📦', navGroup: 'Reference' },
+  { id: 'movers', label: 'Movers', icon: '🚛', navGroup: 'Reference' },
+  { id: 'savings', label: 'Costs', icon: '💵', navGroup: 'Reference' }
 ];
 
 function getMoveProfile() {
@@ -45,7 +42,7 @@ function isHouseMove() {
 
 function getVisibleAppSections() {
   return appSections.filter(sec => {
-    if (sec.category === 'apartment' && !needsApartmentHunt()) return false;
+    if (sec.navGroup === 'Apartment' && !needsApartmentHunt()) return false;
     if (sec.id === 'movers' && !usesProfessionalMovers()) return false;
     return true;
   });
@@ -273,34 +270,22 @@ window.openMobileMenu = function() {
     </button>
   `;
   const visibleSections = getVisibleAppSections();
-  const generalSecs = visibleSections.filter(s => s.category === 'general');
-  const aptSecs = visibleSections.filter(s => s.category === 'apartment');
-  const workSecs = visibleSections.filter(s => s.navGroup === 'Work');
-  const referenceSecs = visibleSections.filter(s => s.navGroup === 'Reference');
+  const navGroups = ['Start Here', 'Work', 'Apartment', 'Reference']
+    .map(title => ({ title, sections: visibleSections.filter(s => s.navGroup === title) }))
+    .filter(group => group.sections.length);
 
   overlay.innerHTML = `
     <div class="mt-mobile-menu-header">
       <h2>Move Map</h2>
       <button class="mt-mobile-menu-close" id="mt-mobile-menu-close">×</button>
     </div>
-    <div class="mt-mobile-grid-bubbles mt-general-row">
-      ${generalSecs.map(bubble).join('')}
-    </div>
     <div class="mt-mobile-groups">
-      ${aptSecs.length ? `
+      ${navGroups.map(group => `
         <div class="mt-mobile-column">
-          <div class="mt-mobile-column-title">🔑 Finding an Apartment</div>
-          <div class="mt-mobile-grid-bubbles">${aptSecs.map(bubble).join('')}</div>
+          <div class="mt-mobile-column-title">${group.title}</div>
+          <div class="mt-mobile-grid-bubbles">${group.sections.map(bubble).join('')}</div>
         </div>
-      ` : ''}
-      <div class="mt-mobile-column">
-        <div class="mt-mobile-column-title">📦 Work</div>
-        <div class="mt-mobile-grid-bubbles">${workSecs.map(bubble).join('')}</div>
-      </div>
-      <div class="mt-mobile-column">
-        <div class="mt-mobile-column-title">🗂 Reference</div>
-        <div class="mt-mobile-grid-bubbles">${referenceSecs.map(bubble).join('')}</div>
-      </div>
+      `).join('')}
     </div>
     <div class="mt-mobile-menu-bottom">
       <div class="mt-progress-meta"><span>MOVE PROGRESS</span><span>${pct}% Done</span></div>
@@ -1131,6 +1116,7 @@ function attachHandlers() {
           ].join('\n');
           if (!confirm(message)) return;
           state = AppEngine.sanitizeState(parsed);
+          state.recentlyRemovedBox = null;
           AppEngine.saveState(state);
           render();
         } catch (e) {

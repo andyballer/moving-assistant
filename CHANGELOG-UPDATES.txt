@@ -1,5 +1,9 @@
 Moving Assistant — Product Update Changelog
 
+2026-07-11
+- Fixed Box Inventory's removed-box undo banner so it clears on reload and backup import, can be dismissed explicitly, and disappears automatically after eight seconds.
+- Unified desktop and mobile navigation around the same Start Here, Work, Apartment, and Reference groups, keeping Costs in Reference on every screen size.
+
 2026-07-08
 - Reworked the Dashboard into a stronger guided coach surface with current-stage summary, outstanding gap callouts, and a clearer next 10-minute action.
 - Simplified navigation into Start Here, Work, Apartment, and Reference groups so the app pulls from Today first instead of treating every tool as equal.

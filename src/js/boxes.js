@@ -1,4 +1,11 @@
 window.MovingBoxes = (function() {
+  let undoBannerTimeout = null;
+
+  function clearUndoBannerTimeout() {
+    if (undoBannerTimeout) clearTimeout(undoBannerTimeout);
+    undoBannerTimeout = null;
+  }
+
   function suggestedBoxToBox(ctx, suggestion, indexOverride) {
     const { state } = ctx;
     const number = typeof indexOverride === 'number' ? indexOverride : ((state.boxes || []).length + 1);
@@ -145,7 +152,10 @@ window.MovingBoxes = (function() {
       ${state.recentlyRemovedBox ? `
         <div class="mt-box-undo-banner">
           <span>Removed ${esc(state.recentlyRemovedBox.label || 'box')}.</span>
-          <button class="mt-mini-action" id="mt-box-undo-remove">Undo</button>
+          <span class="mt-box-undo-banner-actions">
+            <button class="mt-mini-action" id="mt-box-undo-remove">Undo</button>
+            <button class="mt-mini-action mt-mini-action-dismiss" id="mt-box-dismiss-remove" aria-label="Dismiss removed box message">×</button>
+          </span>
         </div>
       ` : ''}
       <div class="mt-dashboard-metrics" style="margin-bottom:16px;">
@@ -227,6 +237,14 @@ window.MovingBoxes = (function() {
         state.boxes.push(suggestedBoxToBox(ctx, suggestion));
         AppEngine.saveState(state);
         render();
+        clearUndoBannerTimeout();
+        undoBannerTimeout = setTimeout(() => {
+          if (!state.recentlyRemovedBox || state.recentlyRemovedBox.id !== id) return;
+          state.recentlyRemovedBox = null;
+          undoBannerTimeout = null;
+          AppEngine.saveState(state);
+          render();
+        }, 8000);
       });
     });
 
@@ -349,11 +367,22 @@ window.MovingBoxes = (function() {
     const undoRemoveBtn = root.querySelector('#mt-box-undo-remove');
     if (undoRemoveBtn) {
       undoRemoveBtn.addEventListener('click', () => {
+        clearUndoBannerTimeout();
         if (!state.recentlyRemovedBox) return;
         if (!state.boxes) state.boxes = [];
         if (!state.boxes.some(box => box.id === state.recentlyRemovedBox.id)) {
           state.boxes.push({ ...state.recentlyRemovedBox });
         }
+        state.recentlyRemovedBox = null;
+        AppEngine.saveState(state);
+        render();
+      });
+    }
+
+    const dismissRemoveBtn = root.querySelector('#mt-box-dismiss-remove');
+    if (dismissRemoveBtn) {
+      dismissRemoveBtn.addEventListener('click', () => {
+        clearUndoBannerTimeout();
         state.recentlyRemovedBox = null;
         AppEngine.saveState(state);
         render();

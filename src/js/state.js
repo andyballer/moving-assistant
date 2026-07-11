@@ -765,6 +765,7 @@ window.MovingApp.loadState = function() {
       const saved = localStorage.getItem(key);
       if (!saved) continue;
       const migrated = window.MovingApp.sanitizeState(JSON.parse(saved));
+      migrated.recentlyRemovedBox = null;
       if (key !== window.MovingApp.STORAGE_KEY) window.MovingApp.saveState(migrated);
       return migrated;
     }

@@ -27,6 +27,11 @@ function loadStateModule() {
 }
 
 function renderAppWithState(savedState) {
+  return bootAppWithState(savedState).rootEl.innerHTML;
+}
+
+function bootAppWithState(savedState) {
+  const appendedElements = [];
   const rootEl = {
     innerHTML: '',
     querySelector() { return null; },
@@ -48,7 +53,7 @@ function renderAppWithState(savedState) {
     location: { reload() {} },
     URL,
     document: {
-      body: { appendChild() {} },
+      body: { appendChild(element) { appendedElements.push(element); } },
       createElement() { return { ...noopElement, style: {} }; },
       getElementById(id) { return id === 'move-tracker-root' ? rootEl : noopElement; }
     },
@@ -71,7 +76,7 @@ function renderAppWithState(savedState) {
   ['src/js/state.js', 'src/js/apartments.js', 'src/js/boxes.js', 'src/js/movers.js', 'src/js/dashboard.js', 'src/js/rooms.js', 'src/js/utilities.js', 'src/js/deadlines.js', 'src/js/dayof.js', 'src/js/savings.js', 'src/js/supplies.js', 'src/js/tasks.js', 'src/js/app.js'].forEach((relPath) => {
     vm.runInContext(read(relPath), context, { filename: relPath });
   });
-  return rootEl.innerHTML;
+  return { context, rootEl, appendedElements };
 }
 
 function sameRealm(value) {
@@ -139,6 +144,23 @@ test('navigation tabs and state-valid tabs stay in sync', () => {
   assert.equal(sectionIds[0], 'dashboard');
   assert.match(appJs, /navGroup: 'Start Here'/);
   assert.match(appJs, /navGroup: 'Reference'/);
+});
+
+test('mobile navigation renders the same four nav groups as desktop', () => {
+  const { context, appendedElements } = bootAppWithState({
+    userName: 'Test', targetMoveDate: '2026-08-15', activeTab: 'dashboard',
+    moveProfile: { apartmentHunt: true, moveStyle: 'movers', buildingType: 'apartment' }
+  });
+  context.openMobileMenu();
+  const html = appendedElements.at(-1).innerHTML;
+  const groups = [...html.matchAll(/mt-mobile-column-title">([^<]+)<[\s\S]*?mt-mobile-grid-bubbles">([\s\S]*?)<\/div>/g)]
+    .map(match => ({ title: match[1], tabs: [...match[2].matchAll(/data-mobile-tab="([^"]+)"/g)].map(tab => tab[1]) }));
+  assert.deepEqual(groups, [
+    { title: 'Start Here', tabs: ['dashboard'] },
+    { title: 'Work', tabs: ['tasks', 'rooms', 'boxes', 'addressutil'] },
+    { title: 'Apartment', tabs: ['aptsearch', 'apartments'] },
+    { title: 'Reference', tabs: ['dayof', 'supplies', 'movers', 'savings'] }
+  ]);
 });
 
 test('default state has the expected core shape', () => {
@@ -213,7 +235,23 @@ test('box inventory can undo untouched suggested boxes', () => {
   assert.match(html, /Undo 1 suggested box/);
 });
 
-test('box inventory deletion uses inline undo instead of modal copy', () => {
+test('box inventory deletion renders inline undo and dismiss controls in the current session', () => {
+  const MovingApp = loadStateModule();
+  const context = { window: {}, clearTimeout, setTimeout };
+  vm.createContext(context);
+  vm.runInContext(read('src/js/boxes.js'), context, { filename: 'src/js/boxes.js' });
+  const html = context.window.MovingBoxes.renderBoxes({
+    AppEngine: MovingApp,
+    esc: value => String(value),
+    state: { boxes: [], recentlyRemovedBox: { id: 'removed-1', label: 'Box 1', room: 'Bedroom', contents: ['Sweaters'], status: 'packed' } }
+  });
+  assert.match(html, /Removed Box 1/);
+  assert.match(html, /mt-box-undo-remove/);
+  assert.match(html, /mt-box-dismiss-remove/);
+  assert.doesNotMatch(read('src/js/boxes.js'), /Remove this box from the inventory/);
+});
+
+test('saved removed-box undo state is cleared on a fresh app boot', () => {
   const MovingApp = loadStateModule();
   const html = renderAppWithState({
     schemaVersion: MovingApp.SCHEMA_VERSION,
@@ -223,9 +261,8 @@ test('box inventory deletion uses inline undo instead of modal copy', () => {
     activeTab: 'boxes',
     recentlyRemovedBox: { id: 'removed-1', label: 'Box 1', room: 'Bedroom', contents: ['Sweaters'], status: 'packed' }
   });
-  assert.match(html, /Removed Box 1/);
-  assert.match(html, /mt-box-undo-remove/);
-  assert.doesNotMatch(read('src/js/boxes.js'), /Remove this box from the inventory/);
+  assert.doesNotMatch(html, /Removed Box 1/);
+  assert.doesNotMatch(html, /mt-box-undo-remove/);
 });
 
 test('sanitizeState normalizes move profile applicability fields', () => {
