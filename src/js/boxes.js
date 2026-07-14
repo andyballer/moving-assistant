@@ -165,7 +165,7 @@ window.MovingBoxes = (function() {
         <div class="mt-card" style="padding:16px; margin:0; text-align:center;"><div class="mt-box-big">${counts.unpacked}</div><div class="mt-metric-label">Unpacked</div></div>
       </div>
       ${renderBoxPlan(ctx)}
-      <div class="mt-card">
+      <div class="mt-card" id="mt-box-add-card">
         <div class="mt-card-header"><h3>${editingBox ? `Edit ${esc(editingBox.label)}` : 'Add a box'}</h3></div>
         <div class="mt-card-body" style="padding:16px 20px;">
           <div class="mt-box-form">

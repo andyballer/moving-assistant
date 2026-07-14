@@ -6,6 +6,8 @@ window.MovingSavings = (function() {
     const avoidedMoverHours = Math.max(0, parseFloat(s.avoidedMoverHours) || 0);
     const reusedBoxes = Math.max(0, parseInt(s.reusedBoxes, 10) || 0);
     const avoidedDuplicateBuys = Math.max(0, parseFloat(s.avoidedDuplicateBuys) || 0);
+    const plannedMoveCost = Math.max(0, parseFloat(s.plannedMoveCost) || 0);
+    const actualMoveCost = Math.max(0, parseFloat(s.actualMoveCost) || 0);
     const hasInputs = deposit > 0 || moverHourlyRate > 0 || reusedBoxes > 0 || avoidedDuplicateBuys > 0;
     const depositLow = Math.round(deposit * 0.1);
     const depositHigh = Math.round(deposit * 0.5);
@@ -13,7 +15,8 @@ window.MovingSavings = (function() {
     const boxSavings = Math.round(reusedBoxes * 2.5);
     const low = depositLow + moverSavings + boxSavings + avoidedDuplicateBuys;
     const high = depositHigh + moverSavings + boxSavings + avoidedDuplicateBuys;
-    return { low, high, depositLow, depositHigh, moverSavings, boxSavings, avoidedDuplicateBuys, hasInputs };
+    const costVariance = plannedMoveCost && actualMoveCost ? plannedMoveCost - actualMoveCost : null;
+    return { low, high, depositLow, depositHigh, moverSavings, boxSavings, avoidedDuplicateBuys, hasInputs, plannedMoveCost, actualMoveCost, costVariance };
   }
 
   function renderSavings(ctx) {
@@ -31,11 +34,23 @@ window.MovingSavings = (function() {
         <div class="mt-card mt-savings-metric"><div class="mt-box-big">$${savings.moverSavings.toLocaleString()}</div><div class="mt-metric-label">Mover overtime avoided</div></div>
         <div class="mt-card mt-savings-metric"><div class="mt-box-big">$${(savings.boxSavings + savings.avoidedDuplicateBuys).toLocaleString()}</div><div class="mt-metric-label">Supply/duplicate buys avoided</div></div>
       </div>
+      <div class="mt-card mt-cost-tracker">
+        <div class="mt-card-header"><h3>Move budget vs actual</h3></div>
+        <div class="mt-card-body">
+          <div class="mt-util-fields">
+            <label>Planned move cost<input type="number" min="0" data-savings-field="plannedMoveCost" value="${esc(s.plannedMoveCost || '')}" placeholder="e.g. 2400" /></label>
+            <label>Actual move cost<input type="number" min="0" data-savings-field="actualMoveCost" value="${esc(s.actualMoveCost || '')}" placeholder="Add once known" /></label>
+          </div>
+          <p class="mt-cost-variance ${savings.costVariance === null ? '' : savings.costVariance >= 0 ? 'under' : 'over'}">${savings.costVariance === null ? 'Add both amounts to see where the move landed.' : savings.costVariance >= 0 ? `$${Math.abs(savings.costVariance).toLocaleString()} under budget` : `$${Math.abs(savings.costVariance).toLocaleString()} over budget`}</p>
+        </div>
+      </div>
       <div class="mt-card">
         <div class="mt-card-header"><h3>Savings estimate</h3></div>
         <div class="mt-card-body mt-savings-form-body">
           <div class="mt-util-fields">
             <label>Security deposit amount<input type="number" min="0" data-savings-field="depositAmount" value="${esc(s.depositAmount || '')}" placeholder="e.g. 3500" /></label>
+            <label>Deposit return due<input type="date" data-savings-field="depositReturnDueDate" value="${esc(s.depositReturnDueDate || '')}" /></label>
+            <label class="mt-inline-check"><input type="checkbox" data-savings-field="depositReturned" ${s.depositReturned ? 'checked' : ''} /> Deposit received or resolved</label>
             <label>Mover hourly rate<input type="number" min="0" data-savings-field="moverHourlyRate" value="${esc(s.moverHourlyRate || '')}" placeholder="e.g. 225" /></label>
             <label>Mover hours avoided<input type="number" min="0" step="0.5" data-savings-field="avoidedMoverHours" value="${esc(s.avoidedMoverHours || '')}" placeholder="e.g. 1.5" /></label>
             <label>Borrowed/reused boxes<input type="number" min="0" data-savings-field="reusedBoxes" value="${esc(s.reusedBoxes || '')}" placeholder="e.g. 20" /></label>

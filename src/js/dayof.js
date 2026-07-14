@@ -1,4 +1,72 @@
 window.MovingDayOf = (function() {
+  function getMoveDayItems(ctx) {
+    return (ctx.AppEngine.MOVE_DAY_STAGES || []).flatMap(stage => stage.items.map((text, index) => ({
+      stage: stage.title,
+      emoji: stage.emoji,
+      text,
+      key: `dayof-${stage.title.replace(/\W+/g, '-').toLowerCase()}-${index}`,
+      done: !!ctx.state.checked[`dayof-${stage.title.replace(/\W+/g, '-').toLowerCase()}-${index}`]
+    })));
+  }
+
+  function renderRunMode(ctx) {
+    const items = getMoveDayItems(ctx);
+    const done = items.filter(item => item.done).length;
+    const current = items.find(item => !item.done);
+    const openFirst = (ctx.state.boxes || []).filter(box => box.openFirst && box.status !== 'unpacked');
+    const contacts = ctx.state.contacts || {};
+    const contactRows = [
+      ['Movers', contacts.movers], ['Current building', contacts.doorman],
+      ['New building', contacts.newSuper], ['Backup', contacts.emergency]
+    ].filter(([, value]) => value);
+    const progress = items.length ? Math.round((done / items.length) * 100) : 0;
+    return `
+      <section class="mt-run-mode ${ctx.daysUntilMove() === 0 ? 'is-today' : ''}">
+        <div class="mt-run-mode-head">
+          <div><span class="mt-dashboard-kicker">Focused run mode</span><h2>${current ? 'Do this now' : 'Move-day run sheet complete'}</h2></div>
+          <strong>${done}/${items.length}</strong>
+        </div>
+        <div class="mt-run-progress"><span style="width:${progress}%"></span></div>
+        ${current ? `
+          <label class="mt-current-task">
+            <input type="checkbox" class="mt-check" data-check="${current.key}" aria-label="${ctx.esc(current.text)}" />
+            <span><small>${ctx.esc(current.emoji)} ${ctx.esc(current.stage)}</small><strong>${ctx.esc(current.text)}</strong></span>
+          </label>
+        ` : '<p class="mt-run-complete">Everything is checked. Save the packet, hydrate, and take the win.</p>'}
+        <div class="mt-run-glance">
+          <div><span>Open-first boxes</span><strong>${openFirst.length}</strong><small>${openFirst.length ? ctx.esc(openFirst.slice(0, 3).map(box => box.label).join(' · ')) : 'None still marked'}</small></div>
+          <div><span>Essential contacts</span><strong>${contactRows.length}</strong><small>${contactRows.length ? ctx.esc(contactRows.map(([label]) => label).join(' · ')) : 'Add them under Utilities'}</small></div>
+          <button data-print-move-packet="true">Print / save move packet</button>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderMovePacket(ctx) {
+    const state = ctx.state;
+    const profile = state.moveProfile || {};
+    const openFirst = (state.boxes || []).filter(box => box.openFirst && box.status !== 'unpacked');
+    const contacts = state.contacts || {};
+    const utilities = ctx.AppEngine.UTILITIES.map(name => ({ name, ...(state.utilities[name] || {}) }));
+    const deadlines = (ctx.deadlineItems || []).filter(item => item.status !== 'completed').slice(0, 14);
+    const selectedMovers = ctx.AppEngine.MOVERS.filter(mover => state.movers && state.movers[mover.name]);
+    const movers = [...selectedMovers.map(mover => ({ name: mover.name, phone: mover.phone })), ...(state.customMovers || [])];
+    const moveDate = state.targetMoveDate ? new Date(`${state.targetMoveDate}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
+    const contactRows = [['Movers', contacts.movers], ['Current building', contacts.doorman], ['New building', contacts.newSuper], ['Emergency backup', contacts.emergency]].filter(([, value]) => value);
+    return `
+      <article class="mt-move-packet">
+        <header><span>Moving Assistant</span><h1>${ctx.esc(state.userName || 'My')} move packet</h1><p>${ctx.esc(moveDate)} · ${ctx.esc(profile.borough || 'NYC')} · ${ctx.esc(state.aptSize || '')}</p></header>
+        <section><h2>Fast contacts</h2>${contactRows.length ? `<dl>${contactRows.map(([label, value]) => `<div><dt>${ctx.esc(label)}</dt><dd>${ctx.esc(value)}</dd></div>`).join('')}</dl>` : '<p>No contacts saved.</p>'}</section>
+        <section><h2>Mover / crew</h2>${movers.length ? `<ul>${movers.map(mover => `<li><strong>${ctx.esc(mover.name)}</strong>${mover.phone ? ` — ${ctx.esc(mover.phone)}` : ''}${mover.quoteAmount ? ` — $${ctx.esc(mover.quoteAmount)}` : ''}</li>`).join('')}</ul>` : '<p>DIY move or no mover selected.</p>'}</section>
+        <section><h2>Open-first inventory</h2>${openFirst.length ? `<ul>${openFirst.map(box => `<li><strong>${ctx.esc(box.label)}</strong> (${ctx.esc(box.room)}): ${ctx.esc((box.contents || []).join(', ') || 'contents not listed')}</li>`).join('')}</ul>` : '<p>No active open-first boxes.</p>'}</section>
+        <section><h2>Utilities</h2><ul>${utilities.map(util => `<li><strong>${ctx.esc(util.name)}</strong>: ${ctx.esc(util.provider || 'provider not set')} · ${ctx.esc(util.status || 'not started')}${util.confirmation ? ` · confirmation ${ctx.esc(util.confirmation)}` : ''}</li>`).join('')}</ul></section>
+        <section><h2>Dates to protect</h2>${deadlines.length ? `<ul>${deadlines.map(item => `<li><strong>${ctx.esc(item.dateLabel)}</strong> — ${ctx.esc(item.shortLabel || item.label)}${Number.isFinite(item.cost) ? ` ($${item.cost.toLocaleString()})` : ''}</li>`).join('')}</ul>` : '<p>No tracked dates.</p>'}</section>
+        ${state.notes ? `<section><h2>Move notes</h2><p class="mt-packet-notes">${ctx.esc(state.notes)}</p></section>` : ''}
+        <footer>Generated locally by Moving Assistant · ${new Date().toLocaleDateString()}</footer>
+      </article>
+    `;
+  }
+
   function renderStageCards(ctx, stages, prefix) {
     const { state, esc } = ctx;
     return stages.map(stage => `
@@ -32,6 +100,7 @@ window.MovingDayOf = (function() {
     const guide = AppEngine.MOVER_TIPPING_GUIDE || {};
 
     return `
+      ${renderRunMode(ctx)}
       <div class="mt-alert-box">
         <strong>Move day mode:</strong> this is not the day for cleverness. Follow the run sheet, drink water, and protect the essentials box like it is a royal heirloom.
       </div>
@@ -76,14 +145,16 @@ window.MovingDayOf = (function() {
       </div>
 
       <div class="mt-card">
-        <div class="mt-card-header"><h3>Extra reminders</h3></div>
+        <div class="mt-card-header"><h3>Community-tested packing reminders</h3></div>
         <div class="mt-card-body">
           <ul class="mt-tight-list">
             ${AppEngine.MOVE_TIPS.map(t => `<li>${esc(t)}</li>`).join('')}
           </ul>
+          <p class="mt-source-links">Adapted from practical suggestions shared by <a href="https://www.reddit.com/r/lifehacks/comments/sma1rc/tips_for_moving_efficiently/" target="_blank" rel="noopener noreferrer">r/lifehacks</a> and <a href="https://www.reddit.com/r/AskNYC/comments/apcsvt/tips_for_making_moving_easier/" target="_blank" rel="noopener noreferrer">r/AskNYC</a>.</p>
         </div>
       </div>
       <textarea class="mt-notes-area" id="mt-notes" placeholder="Drop mover arrival windows, elevator info, super phone, food plan, or chaos notes here...">${esc(ctx.state.notes || '')}</textarea>
+      ${renderMovePacket(ctx)}
     `;
   }
 

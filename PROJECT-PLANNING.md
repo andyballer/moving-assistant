@@ -44,6 +44,10 @@ See `Code Audit Findings (2026-07-09)` below and `Next / Planned Work` item 8 fo
 
 **Priority order for this session: fix Bug 1, then Bug 2 (item 8), then item 1 (snooze/not-relevant), then item 2 (borough depth) if time remains.**
 
+Update (2026-07-11): Bug 1 and Bug 2 were committed in `85d76e2`. Snooze/not-relevant controls are now implemented locally with stable focus IDs, persisted dismissal state, one-day snooze, permanent not-relevant handling, and same-session Undo. Verification passes 24/24 tests plus `npm run check:js`. Next product item is borough-level NYC depth, but only once it provides useful advice for the current apartment-search stage.
+
+Update (2026-07-11, continued): borough-level NYC depth is now implemented locally. Move Profile stores the destination borough; Timeline shows official-source curb, loading-zone, and truck-route checks with a bounded Manhattan special-zone warning; and the mover shortlist discloses its Manhattan/close-borough bias outside Manhattan. Citywide rules remain citywide rather than being presented as invented borough differences. Verification passes 25/25 tests plus `npm run check:js`.
+
 1. **Snooze / not-relevant controls for focus items** (`Next / Planned Work` item 4, sub-bullet). Concrete plan:
    - `getTodaysFocusItems()` in `app.js` (~line 585) currently rebuilds a fresh, unkeyed list every render (dedupe key today is `text + '|' + tab`, which changes whenever counts in the text change — not stable enough to persist a dismissal against).
    - Give each focus item a **stable `id`** independent of its display text, e.g. `'move-week-essentials'`, `'timeline-phase'`, `'apartment-hunt'`, `'apartment-tracker'`, `'box'`, `'utility'`, `'room'`, `'backup'`. These map 1:1 to the existing `items.push(...)` call sites in `getTodaysFocusItems()`.
@@ -319,12 +323,7 @@ Full history lives in `CHANGELOG-UPDATES.txt` and git history — not duplicated
    - Keep `moveStyle` because it hides Movers for DIY and now adds DIY rental/helper/loading guidance.
    - Move Profile fields currently in setup all have behavior. Keep this audit item only as a guardrail when adding new profile inputs.
 
-2. First useful NYC-depth behavior: borough-level guidance.
-   - Add `borough` (Manhattan, Brooklyn, Queens, Bronx, Staten Island) as a Move Profile field only once it visibly changes advice — alternate-side parking/truck-loading rules and building-type mix are the strongest early candidates.
-   - Label the built-in mover list clearly if it's Manhattan/close-borough-biased, so users elsewhere in NYC aren't misled.
-   - Use official/primary sources (NYC.gov, DOB, DSNY) before adding any borough-specific legal/permit claims.
-
-3. Continue module extraction.
+2. Continue module extraction.
    - `dashboard.js` is extracted.
    - `rooms.js` is extracted.
    - `utilities.js` is extracted.
@@ -335,33 +334,29 @@ Full history lives in `CHANGELOG-UPDATES.txt` and git history — not duplicated
    - No obvious remaining extraction candidate is queued; pick the next one only when it makes product work safer.
    - Keep each extraction behavior-preserving and tested.
 
-4. Continue Dashboard/mobile UX refinement.
+3. Continue Dashboard/mobile UX refinement.
    - Dashboard deadlines now group into `Today`, `This Week`, and `Later` lanes.
    - First-pass Dashboard deadline chips are in for move day, mover/DIY confirmation, apartment follow-ups/applications/cashier checks, utility dates, and internet equipment return.
    - The first shared deadline helper is extracted in `deadlines.js`; keep using it before adding more one-off deadline sources.
    - Deadline calendar export now uses the same shared helper; keep the `.ics` payload intentionally minimal.
-   - Explore snooze / not relevant controls after Move Profile exists.
+   - Snooze / not-relevant controls are live with stable IDs and Undo; extend only if real use shows a need for a dismissal manager.
+   - Mobile quick actions now keep Today and Boxes within thumb reach, with Add Box and Find Box shortcuts inside Box Inventory.
 
-5. Continue first-week/post-move closeout only if it proves useful.
+4. Continue first-week/post-move closeout only if it proves useful.
    - Initial first-week checklist is live inside Move Day.
    - First-week follow-ups now flow into shared Dashboard deadlines and calendar export.
-   - Next possible expansion: make it time-aware after move day or add a specific deposit-return receipt date if the user enters a landlord/legal deadline.
+   - Dashboard guidance is now time-aware after move day and prioritizes the next unfinished first-week closeout task.
+   - A specific deposit-return due date now feeds Dashboard deadlines and calendar export, and can be marked resolved.
+   - Move Day now leads with a focused one-action run mode and can print/save a compact move packet for offline or household use.
 
-6. Build a shared "dated item" primitive.
-   - One small data shape — due date, status, source module, optional cost, optional short label — used by deadline chips, the printable move packet, and local reminders instead of bespoke implementations.
-   - First consumers are now real: Dashboard deadline chips and `.ics` export.
+5. Extend the shared "dated item" primitive only through real consumers.
+   - The normalized shape — due date, status, source module, optional cost, and short label — is live in `deadlines.js`.
+   - Dashboard deadline chips and `.ics` export consume the shared shape; keep new dated features on this path instead of adding bespoke implementations.
    - An optional cost field on the same primitive is what lets budget-vs-actual fall out of it almost for free — see `Product Ideas`.
 
-7. Build an applicability engine once a third profile field gates content.
+6. Build an applicability engine once a third profile field gates content.
    - Today `apartmentHunt` and `moveStyle` each gate visibility with their own conditional. Once another field gates content, replace the scattered `if` checks with one function that takes the Move Profile and returns which tabs/sections apply.
    - Do this refactor right when the third gate lands, not before — two conditionals don't yet justify the abstraction.
-
-8. Fix mobile nav grouping to actually match desktop (found in `Code Audit Findings (2026-07-09)`).
-   - Retire `category` as a grouping field; use `navGroup` as the single source of truth on both desktop and mobile.
-   - Match mobile column headings to desktop group names exactly (e.g. "Finding an Apartment" vs "Apartment").
-   - Deliberately decide whether "Costs" should be prominent (current mobile behavior — pinned in the top row) or reference-tier (current desktop behavior — bottom of Reference group). Don't leave it silently different by device.
-   - Add real render-level test coverage: call the mobile-menu render path directly and assert group membership, rather than the current test's regex-only substring check.
-   - Small, self-contained, high-confidence fix. Good candidate to do first next session.
 
 ## Sleek & Fun — Identity Ideas
 
@@ -486,7 +481,8 @@ Product-facing ideas (printable move packet, calendar export, etc.) live in `Pro
   - This is the single highest-leverage feature for the stress-reduction thesis: a command center that only speaks when opened isn't actually watching your back. Worth prioritizing over further tab polish.
 
 - Budget: planned vs. actual:
-  - Let the user set a rough moving budget once (movers/truck, deposit, supplies, misc.) and log actual spend against it as receipts/costs come in.
+  - First slice is live: the user can compare a rough planned move cost with the actual total and see the variance.
+  - Possible later expansion: break the total into movers/truck, deposit, supplies, and misc. only if receipt-level tracking proves useful.
   - Directly serves "protecting money" in the North Star, which currently has no dedicated surface — cost protection today is implicit in mover-tip guidance only.
 
 - Combination note — reminders, budget, deadline chips, and calendar export are one feature wearing four hats:

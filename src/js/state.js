@@ -20,7 +20,14 @@ window.MovingApp.ROOMS = ['Kitchen', 'Bedroom', 'Bathroom', 'Closet', 'Living Ro
 window.MovingApp.ROOM_STATUSES = ['Not started', 'In progress', 'Packed'];
 
 window.MovingApp.DONATION_GUIDE = {
-  'Kitchen': ['Duplicate mugs, cups, and utensils', 'Gadgets you forgot you owned', 'Unopened shelf-stable food you will not eat before moving', 'Serving pieces you never reach for'],
+  'Kitchen': [
+    'Duplicate mugs, cups, and utensils',
+    'Gadgets you forgot you owned',
+    'Old cookware decision: keep the smallest reliable set you actually use; donate duplicates, specialty pieces, and pots or pans untouched for a year if they are clean and fully usable',
+    'Do not donate unsafe cookware: recycle or discard pans with loose handles, severe warping, deep rust, cracks, or peeling/chipped nonstick coating',
+    'Unopened shelf-stable food you will not eat before moving',
+    'Serving pieces you never reach for'
+  ],
   'Bedroom': ['Extra bedding sets you do not love', 'Decor pillows you only move from chair to bed', 'Lamps or decor that will not fit the next place', 'Old sheets or towels for textile recycling'],
   'Bathroom': ['Unopened toiletries you will not use', 'Duplicate hair tools', 'Expired products or medications for proper disposal', 'Towels that should become packing padding or textile recycling'],
   'Closet': ['Clothes not worn in the last year', 'Shoes that hurt or need repairs you will not make', 'Bags, belts, and accessories that no longer fit your style', 'Freebie totes and duplicate hangers'],
@@ -154,7 +161,7 @@ window.MovingApp.MOVE_DAY_STAGES = [
   {
     title: 'Before movers arrive',
     emoji: '☕',
-    items: ['Charge phone and keep charger with you', 'Pack meds, wallet, keys, documents, and 2 days of clothes', 'Take photos of the old apartment condition', 'Clear a path from rooms to the door', 'Keep open-first boxes separate from the main pile']
+    items: ['Charge phone and keep charger with you', 'Pack meds, wallet, keys, documents, and 2 days of clothes', 'Take photos of the old apartment condition', 'Clear a path from rooms to the door', 'Stage sealed boxes together without blocking the path to large furniture', 'Keep open-first boxes separate from the main pile', 'Bring a separate cleaning kit to the new place before the truck is unloaded', 'Keep the furniture hardware, labeled bags, and matching tools with you', 'Assign one person to meet the crew at the destination and manage building access if timing overlaps']
   },
   {
     title: 'While the truck is loading',
@@ -169,7 +176,7 @@ window.MovingApp.MOVE_DAY_STAGES = [
   {
     title: 'At the new place',
     emoji: '🏁',
-    items: ['Direct boxes by room before they become a cardboard mountain', 'Set up bed basics first — future you deserves a landing pad', 'Find toilet paper, towels, shower curtain, and soap', 'Plug in router/modem if available', 'Eat something real before unpacking turns feral']
+    items: ['Post the room color/number key at the entrance so every box lands correctly', 'Direct boxes by room before they become a cardboard mountain', 'Set up and make the bed first — future you deserves a landing pad', 'Find toilet paper, towels, shower curtain, and soap', 'Plug in router/modem if available', 'Unpack enough kitchen gear for coffee, breakfast, and water', 'Eat something real before unpacking turns feral']
   },
   {
     title: 'First night sanity kit',
@@ -316,6 +323,16 @@ window.MovingApp.MOVE_TIPS = [
   "Don't schedule anything the day after move day — give yourself a buffer",
   'Keep phone chargers, medications, and important documents on your person, not in a box',
   'Label the outside by room + box number; keep the detailed contents in the app so movers are not reading your sock inventory',
+  'Put the room color or number on the top and two sides of each box, then post the room key at the new entrance',
+  'Photograph each open box with its number visible for a fast visual inventory',
+  'Pack books, dishes, and other heavy items in small boxes; reserve large boxes for light items',
+  'Reuse your shoeboxes for glassware: wrap each piece with bubble wrap, pack the box snugly so nothing shifts, then place and cushion the shoeboxes inside a sturdy moving box labeled Fragile',
+  'Keep hanging clothes on their hangers: slide a clearly marked trash bag up around each bundle from the bottom, then tie it around the hanger necks',
+  'Bag and label furniture hardware by item; keep it with the screwdriver or Allen key needed for reassembly',
+  'Use towels, linens, and clothing as padding where appropriate, but use proper protection for fragile or valuable pieces',
+  'Keep trash visually separate from clothing or soft goods packed in bags so nothing is thrown away by mistake',
+  'For apartment moves, compare reusable bin rental with cardboard: bins stack cleanly and avoid box disposal, but pickup deadlines require prompt unpacking',
+  'Clean dusty furniture and inspect or vacuum soft furnishings before they enter the moving truck',
   'For your deposit: photograph every room after it is empty, including inside appliances, cabinets, closets, floors, windows, and repaired wall spots',
   'Take a deep breath — everyone hates moving, this feeling is normal and temporary'
 ];
@@ -328,6 +345,7 @@ window.MovingApp.SAVINGS_PLAYS = [
   { title: 'Use the box plan to avoid duplicate purchases', detail: 'Searchable boxes make it less likely you rebuy chargers, tools, toiletries, kitchen basics, or cleaning supplies you already packed.' },
   { title: 'Donate or sell before the final week', detail: 'Early donation/resale avoids paying movers to transport things you do not want and prevents last-minute trash/removal costs.' },
   { title: 'Borrow or reuse boxes where possible', detail: 'Uniform boxes are helpful, but free boxes from neighbors, work, or recent deliveries can cut supply cost if they are sturdy and clean.' },
+  { title: 'Price reusable moving-bin rental', detail: 'Delivered stackable bins can reduce assembly and disposal work on a local NYC move. Compare the rental window, delivery/pickup fees, quantity, and late charges against cardboard.' },
   { title: 'Avoid first-night convenience spending', detail: 'Open-first boxes and food planning prevent expensive emergency runs for toiletries, chargers, bedding, tools, and takeout decisions.' }
 ];
 
@@ -339,11 +357,11 @@ window.MovingApp.MOVER_TIPPING_GUIDE = {
 };
 
 window.MovingApp.TIMELINE_DATA_MATRIX = [
-  { id: '8wk', weeksOut: 8, label: '8 Weeks: Set the Plan', items: ['Set a target rent range you would actually feel okay paying [10m]', 'Fill in the Savings estimate: deposit, mover rate, reused boxes, duplicate buys [10m]', 'Request written quotes from 3-5 movers for your move date or target week [45m]', 'Ask both buildings for moving rules: elevator hours, COI wording, loading dock, fees [20m]', 'Review your lease for move-out rules, notice deadline, cleaning requirements, and deposit return process [20m]', 'Start one donation bag from the room suggestions [30m]'] },
+  { id: '8wk', weeksOut: 8, label: '8 Weeks: Set the Plan', items: ['Set a target rent range you would actually feel okay paying [10m]', 'Fill in the Savings estimate: deposit, mover rate, reused boxes, duplicate buys [10m]', 'Request written quotes from 3-5 movers for your move date or target week; send the same photo/video inventory to each [45m]', 'Ask both buildings for moving rules: elevator hours, COI wording, loading dock, fees [20m]', 'Review your lease for move-out rules, notice deadline, cleaning requirements, and deposit return process [20m]', 'Start one donation bag from the room suggestions [30m]', 'Compare delivered reusable-bin rental with sturdy cardboard, including pickup and late fees [20m]'] },
   { id: '6wk', weeksOut: 6, label: '6 Weeks: Book the Big Pieces', items: ['Book the mover once your date/window is realistic; get written confirmation and deposit receipt [30m]', 'Send the booked mover both buildings\' COI instructions and ask them to issue the certificate [15m]', 'Schedule first donation pickup/dropoff so the first bag actually leaves [15m]', 'Reserve freight elevator or loading slot if either building allows early booking [20m]', 'Ask building management what repairs you may do yourself: nail holes, paint touch-ups, wall anchors [10m]'] },
-  { id: '4wk', weeksOut: 4, label: '4 Weeks: Lock Logistics', items: ['Confirm elevator reservation slot with current and new buildings [15m]', 'Order supplies: boxes, tape, markers, labels, packing paper [20m]', 'Buy deposit-repair basics: spackle, putty knife, sanding sponge, magic erasers, matching touch-up paint if allowed [25m]', 'Notify current landlord or building management in writing [10m]', 'Schedule internet setup for the new place [20m]', 'Confirm the mover sent the COI or gave you a copy to forward [10m]'] },
-  { id: '2wk', weeksOut: 2, label: '2 Weeks: Approvals & Non-Essentials', items: ['Forward the mover COI to building management and ask for written approval [20m]', 'Book bed disassembly help if needed (TaskRabbit/friend/mover add-on) [30m]', 'Do a second donation dropoff/pickup before packing accelerates [45m]', 'Patch small nail holes and wall-anchor holes only if your lease/building allows it [45m]', 'Pack non-essentials: books, decor, off-season clothes, storage [2h]', 'File USPS mail forwarding [15m]'] },
-  { id: 'movingwk', weeksOut: 1, label: '1 Week: Launch Prep', items: ['Call movers to confirm arrival window, crew size, truck access, elevator time, and COI approval [15m]', 'Pack "open first" essentials: meds, chargers, documents, toiletries, 2 days clothes [1h]', 'Defrost freezer and clean fridge [45m]', 'Touch up allowed wall repairs after spackle dries; skip repainting whole walls unless required [45m]', 'Clean appliances, bathroom, cabinets, floors, and windowsills for deposit return [2h]', 'Finish final donation/trash run so it does not ride in the truck [45m]'] },
+  { id: '4wk', weeksOut: 4, label: '4 Weeks: Lock Logistics', items: ['Confirm elevator reservation slot with current and new buildings [15m]', 'Order supplies: sturdy boxes in consistent sizes, tape gun, markers, room-color labels, packing paper [20m]', 'Buy deposit-repair basics: spackle, putty knife, sanding sponge, magic erasers, matching touch-up paint if allowed [25m]', 'Notify current landlord or building management in writing [10m]', 'Schedule internet setup for the new place [20m]', 'Confirm the mover sent the COI or gave you a copy to forward [10m]', 'Choose a room color/number system and make a destination room key [15m]'] },
+  { id: '2wk', weeksOut: 2, label: '2 Weeks: Approvals & Non-Essentials', items: ['Forward the mover COI to building management and ask for written approval [20m]', 'Book bed disassembly help if needed (TaskRabbit/friend/mover add-on) [30m]', 'Do a second donation dropoff/pickup before packing accelerates [45m]', 'Patch small nail holes and wall-anchor holes only if your lease/building allows it [45m]', 'Pack non-essentials: books, decor, off-season clothes, storage [2h]', 'File USPS mail forwarding [15m]', 'Number boxes and photograph the contents before sealing, with the number visible [30m]'] },
+  { id: 'movingwk', weeksOut: 1, label: '1 Week: Launch Prep', items: ['Call movers to confirm arrival window, crew size, truck access, elevator time, and COI approval [15m]', 'Pack "open first" essentials: meds, chargers, documents, toiletries, bedding, towels, and 2 days clothes [1h]', 'Defrost freezer and clean fridge [45m]', 'Touch up allowed wall repairs after spackle dries; skip repainting whole walls unless required [45m]', 'Clean appliances, bathroom, cabinets, floors, and windowsills for deposit return [2h]', 'Finish final donation/trash run so it does not ride in the truck [45m]', 'Make a carry-with-you cleaning kit: broom/dustpan, cloths, cleaner, trash bags, paper towels, and gloves [20m]', 'Bag and label furniture hardware; pair it with the tools needed for reassembly [30m]', 'Keep clothes on their hangers; slide clearly marked trash bags up around bundles and tie them at the hanger necks [30m]', 'Ask the mover what to empty, wrap, or disassemble yourself, then finish only the agreed prep [30m]', 'Choose who will meet the truck and coordinate access at the destination [10m]'] },
   { id: 'moveday', weeksOut: 0, label: 'Move Day: Execution', items: ['Final walkthrough: check every drawer, cabinet, closet, and outlet [20m]', 'Take empty-apartment photos/video: walls, floors, appliances, bathroom, cabinets, windows, keys/fobs [20m]', 'Hand off keys to current building management and get written confirmation if possible [10m]', 'Send forwarding address and deposit return request to landlord/building management [10m]', 'Check in with new super/doorman for elevator and access [10m]', 'Direct boxes by room before they become a cardboard mountain [30m]', 'Unpack open-first boxes and bedding [1h]'] }
 ];
 
@@ -538,7 +556,8 @@ window.MovingApp.defaultState = function() {
     moveProfile: {
       apartmentHunt: true,
       moveStyle: 'movers',
-      buildingType: 'apartment'
+      buildingType: 'apartment',
+      borough: 'manhattan'
     },
     neighborhoods: [...window.MovingApp.DEFAULT_NEIGHBORHOODS],
     targetBudgetMin: '',
@@ -554,6 +573,7 @@ window.MovingApp.defaultState = function() {
     boxStatusFilter: 'all',
     editingBoxId: '',
     recentlyRemovedBox: null,
+    dismissedFocusItems: {},
     rooms: window.MovingApp.ROOMS.reduce((acc, r) => ({ ...acc, [r]: 'Not started' }), {}),
     roomChecklist: {},
     utilities: window.MovingApp.UTILITIES.reduce((acc, u) => ({ ...acc, [u]: {
@@ -569,7 +589,11 @@ window.MovingApp.defaultState = function() {
     } }), {}),
     contacts: { movers: '', doorman: '', newSuper: '', emergency: '' },
     moverTip: { crewSize: 3, hours: 4, rate: 8, service: 'good' },
-    savings: { depositAmount: '', moverHourlyRate: '', avoidedMoverHours: '1', reusedBoxes: '', avoidedDuplicateBuys: '' },
+    savings: {
+      depositAmount: '', depositReturnDueDate: '', depositReturned: false,
+      plannedMoveCost: '', actualMoveCost: '', moverHourlyRate: '',
+      avoidedMoverHours: '1', reusedBoxes: '', avoidedDuplicateBuys: ''
+    },
     backupExportedAt: '',
     celebrationLog: {},
     notes: '',
@@ -613,7 +637,8 @@ window.MovingApp.sanitizeState = function(input) {
   merged.moveProfile = {
     apartmentHunt: typeof profile.apartmentHunt === 'boolean' ? profile.apartmentHunt : true,
     moveStyle: ['movers', 'diy'].includes(profile.moveStyle) ? profile.moveStyle : 'movers',
-    buildingType: ['apartment', 'house'].includes(profile.buildingType) ? profile.buildingType : 'apartment'
+    buildingType: ['apartment', 'house'].includes(profile.buildingType) ? profile.buildingType : 'apartment',
+    borough: ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten-island'].includes(profile.borough) ? profile.borough : 'manhattan'
   };
   delete merged.city;
   merged.neighborhoods = Array.isArray(input.neighborhoods)
@@ -685,6 +710,19 @@ window.MovingApp.sanitizeState = function(input) {
     source: typeof input.recentlyRemovedBox.source === 'string' ? input.recentlyRemovedBox.source : '',
     sourceKey: typeof input.recentlyRemovedBox.sourceKey === 'string' ? input.recentlyRemovedBox.sourceKey : ''
   } : null;
+  const dismissedFocusItems = input.dismissedFocusItems && typeof input.dismissedFocusItems === 'object' && !Array.isArray(input.dismissedFocusItems)
+    ? input.dismissedFocusItems
+    : {};
+  merged.dismissedFocusItems = Object.entries(dismissedFocusItems).reduce((acc, [id, dismissal]) => {
+    if (!id || !dismissal || typeof dismissal !== 'object') return acc;
+    const mode = dismissal.mode;
+    if (!['snoozed', 'not-relevant'].includes(mode)) return acc;
+    acc[id] = {
+      mode,
+      until: mode === 'snoozed' && typeof dismissal.until === 'string' ? dismissal.until : null
+    };
+    return acc;
+  }, {});
   merged.contacts = input.contacts && typeof input.contacts === 'object' ? {
     movers: input.contacts.movers || '',
     doorman: input.contacts.doorman || '',
@@ -701,6 +739,10 @@ window.MovingApp.sanitizeState = function(input) {
   const savings = input.savings && typeof input.savings === 'object' ? input.savings : {};
   merged.savings = {
     depositAmount: savings.depositAmount || '',
+    depositReturnDueDate: savings.depositReturnDueDate || '',
+    depositReturned: !!savings.depositReturned,
+    plannedMoveCost: savings.plannedMoveCost || '',
+    actualMoveCost: savings.actualMoveCost || '',
     moverHourlyRate: savings.moverHourlyRate || '',
     avoidedMoverHours: savings.avoidedMoverHours || '1',
     reusedBoxes: savings.reusedBoxes || '',

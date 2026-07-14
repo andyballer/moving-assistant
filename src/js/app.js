@@ -1,5 +1,7 @@
 const AppEngine = window.MovingApp;
 let state = AppEngine.loadState();
+let recentlyDismissedFocus = null;
+let pendingSearchMatch = null;
 
 if (!state.activeTab) {
   state.activeTab = 'dashboard';
@@ -46,6 +48,64 @@ function getVisibleAppSections() {
     if (sec.id === 'movers' && !usesProfessionalMovers()) return false;
     return true;
   });
+}
+
+function addSearchRecords(records, tab, group, value) {
+  if (value == null || value === '') return;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const text = String(value).trim();
+    if (text.length > 2) records.push({ tab, group, text });
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach(item => addSearchRecords(records, tab, group, item));
+    return;
+  }
+  if (typeof value === 'object') {
+    Object.values(value).forEach(item => addSearchRecords(records, tab, group, item));
+  }
+}
+
+function getGlobalSearchRecords() {
+  const records = [];
+  const sources = [
+    ['tasks', 'Timeline', AppEngine.TIMELINE_DATA_MATRIX],
+    ['rooms', 'Rooms', AppEngine.ROOM_PACKING_GUIDE],
+    ['rooms', 'Donation guide', AppEngine.DONATION_GUIDE],
+    ['rooms', 'Installed items', AppEngine.INSTALLED_ITEM_REMINDERS],
+    ['boxes', 'Boxes', AppEngine.DEFAULT_BOX_PLAN],
+    ['addressutil', 'Utilities', AppEngine.UTILITY_GUIDE],
+    ['addressutil', 'Address changes', AppEngine.ADDRESS_CHANGES],
+    ['dayof', 'Move day', AppEngine.MOVE_DAY_STAGES],
+    ['dayof', 'First week', AppEngine.FIRST_WEEK_STAGES],
+    ['dayof', 'Packing reminders', AppEngine.MOVE_TIPS],
+    ['supplies', 'Supplies', AppEngine.SUPPLIES],
+    ['movers', 'Movers', AppEngine.MOVERS],
+    ['savings', 'Cost-saving ideas', AppEngine.SAVINGS_PLAYS],
+    ['aptsearch', 'Apartment search', AppEngine.APT_HUNT_GUIDES],
+    ['apartments', 'Saved apartments', state.apartments],
+    ['boxes', 'Your box inventory', state.boxes],
+    ['rooms', 'Your room plan', state.roomItems],
+    ['addressutil', 'Your utility notes', state.utilities]
+  ];
+  sources.forEach(([tab, group, value]) => addSearchRecords(records, tab, group, value));
+  return records;
+}
+
+function searchMovingAssistant(query) {
+  const terms = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (!terms.length) return [];
+  const visibleTabs = new Set(getVisibleAppSections().map(section => section.id));
+  const seen = new Set();
+  return getGlobalSearchRecords()
+    .filter(record => visibleTabs.has(record.tab) && terms.every(term => record.text.toLowerCase().includes(term)))
+    .filter(record => {
+      const key = `${record.tab}|${record.text}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 12);
 }
 
 function ensureVisibleActiveTab() {
@@ -127,6 +187,16 @@ function getSetupFormHtml() {
           <option value="house" ${profile.buildingType === 'house' ? 'selected' : ''}>House / standalone</option>
         </select>
       </div>
+      <div class="mt-wizard-field">
+        <label>Destination borough</label>
+        <select id="wiz-borough">
+          <option value="manhattan" ${profile.borough === 'manhattan' || !profile.borough ? 'selected' : ''}>Manhattan</option>
+          <option value="brooklyn" ${profile.borough === 'brooklyn' ? 'selected' : ''}>Brooklyn</option>
+          <option value="queens" ${profile.borough === 'queens' ? 'selected' : ''}>Queens</option>
+          <option value="bronx" ${profile.borough === 'bronx' ? 'selected' : ''}>Bronx</option>
+          <option value="staten-island" ${profile.borough === 'staten-island' ? 'selected' : ''}>Staten Island</option>
+        </select>
+      </div>
       <button class="mt-wizard-btn" id="wiz-submit">Build My Move Plan</button>
     </div>
   `;
@@ -150,6 +220,7 @@ function bindSetupForm(root) {
     const apartmentHunt = root.querySelector('#wiz-apartment-hunt').value === 'yes';
     const moveStyle = root.querySelector('#wiz-move-style').value;
     const buildingType = root.querySelector('#wiz-building-type').value;
+    const borough = root.querySelector('#wiz-borough').value;
     if (!name || !date) return alert('Just need your name and move date to get started!');
     state.userName = name;
     state.targetMoveDate = date;
@@ -160,7 +231,8 @@ function bindSetupForm(root) {
       ...(state.moveProfile || {}),
       apartmentHunt,
       moveStyle,
-      buildingType
+      buildingType,
+      borough
     };
     state.showWizardOverride = false;
     ensureVisibleActiveTab();
@@ -567,13 +639,33 @@ function getBackupFocusItem() {
   return { text: 'Export one backup before the chaos gets spicy', phase: 'Data safety', tab: 'dashboard', type: 'backup', done: { kind: 'backup' } };
 }
 
+function getPostMoveFocusItem() {
+  for (const stage of (AppEngine.FIRST_WEEK_STAGES || [])) {
+    for (let i = 0; i < stage.items.length; i++) {
+      const key = `firstweek-${stage.title.replace(/\W+/g, '-').toLowerCase()}-${i}`;
+      if (!state.checked[key]) {
+        return {
+          id: 'post-move-closeout',
+          text: stage.items[i],
+          phase: stage.title,
+          tab: 'dayof',
+          type: 'urgent',
+          done: { kind: 'check', key }
+        };
+      }
+    }
+  }
+  return null;
+}
+
 function getTodaysFocusItems() {
   const days = daysUntilMove();
   const items = [];
 
-  if (days <= 7) {
+  if (days >= 0 && days <= 7) {
     const essentialsKey = 'movingwk-1';
     items.push({
+      id: 'move-week-essentials',
       text: 'Pack / confirm your open-first essentials box',
       phase: 'Move week survival mode',
       tab: 'dayof',
@@ -582,42 +674,52 @@ function getTodaysFocusItems() {
     });
   }
 
-  const timeline = getPhaseFocusItem(AppEngine.TIMELINE_DATA_MATRIX, { timingAware: true });
-  if (timeline) items.push(timeline);
-
-  if (needsApartmentHunt()) {
-    const apt = getPhaseFocusItem(AppEngine.APT_PHASES, { timingAware: true }) || getApartmentGuideFocusItem();
-    if (apt) items.push(apt);
-
-    const aptTracker = getApartmentTrackerFocusItem();
-    if (aptTracker) items.push(aptTracker);
+  if (days < 0) {
+    const postMove = getPostMoveFocusItem();
+    if (postMove) items.push(postMove);
   }
 
-  const box = getBoxFocusItem();
-  if (box) items.push(box);
+  const timeline = days >= 0 ? getPhaseFocusItem(AppEngine.TIMELINE_DATA_MATRIX, { timingAware: true }) : null;
+  if (timeline) items.push({ ...timeline, id: 'timeline-phase' });
+
+  if (days >= 0 && needsApartmentHunt()) {
+    const apt = getPhaseFocusItem(AppEngine.APT_PHASES, { timingAware: true }) || getApartmentGuideFocusItem();
+    if (apt) items.push({ ...apt, id: 'apartment-hunt' });
+
+    const aptTracker = getApartmentTrackerFocusItem();
+    if (aptTracker) items.push({ ...aptTracker, id: 'apartment-tracker' });
+  }
+
+  const box = days >= 0 ? getBoxFocusItem() : null;
+  if (box) items.push({ ...box, id: 'box' });
 
   const utility = getUtilityFocusItem();
-  if (days <= 21 && utility) items.push(utility);
+  if (days <= 21 && utility) items.push({ ...utility, id: 'utility' });
 
-  const room = getRoomFocusItem();
-  if (room) items.push(room);
+  const room = days >= 0 ? getRoomFocusItem() : null;
+  if (room) items.push({ ...room, id: 'room' });
 
   const backup = getBackupFocusItem();
-  if (backup) items.push(backup);
+  if (backup) items.push({ ...backup, id: 'backup' });
 
-  if (!items.length) return [{ text: "No urgent tasks — go drink water and admire your progress.", phase: 'All clear', tab: 'dashboard', type: 'clear' }];
+  if (!items.length) return [{ id: 'all-clear', text: "No urgent tasks — go drink water and admire your progress.", phase: 'All clear', tab: 'dashboard', type: 'clear' }];
 
   const seen = new Set();
-  return items.filter(item => {
-    const key = item.text + '|' + item.tab;
-    if (seen.has(key)) return false;
-    seen.add(key);
+  const visibleItems = items.filter(item => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    const dismissal = (state.dismissedFocusItems || {})[item.id];
+    if (!dismissal) return true;
+    if (dismissal.mode === 'not-relevant') return false;
+    if (dismissal.mode === 'snoozed' && dismissal.until && new Date(dismissal.until).getTime() > Date.now()) return false;
     return true;
   }).slice(0, 3);
+  return visibleItems.length ? visibleItems : [{ id: 'all-clear', text: "No urgent tasks — go drink water and admire your progress.", phase: 'All clear', tab: 'dashboard', type: 'clear' }];
 }
 
 function getStageName(days) {
-  if (days <= 0) return 'move day / first-week follow-up';
+  if (days < 0) return 'first-week closeout and settling in';
+  if (days === 0) return 'move day execution';
   if (days <= 7) return 'move week execution';
   if (days <= 14) return 'final confirmation and open-first packing';
   if (days <= 28) return 'packing, utilities, and building logistics';
@@ -627,6 +729,15 @@ function getStageName(days) {
 
 function getCurrentPhaseProgress() {
   const days = daysUntilMove();
+  if (days < 0) {
+    const stages = AppEngine.FIRST_WEEK_STAGES || [];
+    const items = stages.flatMap(stage => stage.items.map((text, i) => ({
+      text,
+      key: `firstweek-${stage.title.replace(/\W+/g, '-').toLowerCase()}-${i}`
+    })));
+    const done = items.filter(item => !!state.checked[item.key]).length;
+    return { label: 'First-week closeout', done, total: items.length, remaining: Math.max(0, items.length - done) };
+  }
   const eligible = getEligiblePhases(AppEngine.TIMELINE_DATA_MATRIX, days);
   const phase = eligible[0] || AppEngine.TIMELINE_DATA_MATRIX[0];
   const items = phase ? phase.items : [];
@@ -640,7 +751,8 @@ function getCurrentPhaseProgress() {
 }
 
 function getCoachSummary() {
-  const days = Math.max(0, daysUntilMove());
+  const rawDays = daysUntilMove();
+  const days = Math.max(0, rawDays);
   const phase = getCurrentPhaseProgress();
   const deadlines = getUpcomingDeadlines();
   const overdueDeadlines = deadlines.filter(item => item.days < 0).length;
@@ -657,11 +769,11 @@ function getCoachSummary() {
   if (phase.remaining) watch.push(`${phase.remaining} item${phase.remaining === 1 ? '' : 's'} left in ${phase.label}`);
   if (needsApartmentHunt() && apartmentActions) watch.push(`${apartmentActions} apartment follow-up${apartmentActions === 1 ? '' : 's'}`);
   if (days <= 21 && utilitiesDone < AppEngine.UTILITIES.length) watch.push(`${AppEngine.UTILITIES.length - utilitiesDone} utility setup item${AppEngine.UTILITIES.length - utilitiesDone === 1 ? '' : 's'}`);
-  if (days <= 14 && !openFirst) watch.push('no open-first box marked yet');
-  if (days <= 28 && packedRooms < AppEngine.ROOMS.length) watch.push(`${AppEngine.ROOMS.length - packedRooms} room${AppEngine.ROOMS.length - packedRooms === 1 ? '' : 's'} not packed`);
+  if (rawDays >= 0 && days <= 14 && !openFirst) watch.push('no open-first box marked yet');
+  if (rawDays >= 0 && days <= 28 && packedRooms < AppEngine.ROOMS.length) watch.push(`${AppEngine.ROOMS.length - packedRooms} room${AppEngine.ROOMS.length - packedRooms === 1 ? '' : 's'} not packed`);
 
   return {
-    stage: getStageName(days),
+    stage: getStageName(rawDays),
     phase,
     watch: watch.slice(0, 4),
     status: watch.length
@@ -760,6 +872,14 @@ function renderHeader() {
           <p>Target Date: <span class="mt-target-date">${formattedMoveDate} (${weekday})</span></p>
         </div>
       </div>
+      <div class="mt-global-search">
+        <label class="mt-search-input-wrap">
+          <span aria-hidden="true">🔎</span>
+          <input id="mt-global-search-input" type="search" placeholder="Search everything…" autocomplete="off" aria-label="Search the moving assistant" />
+          <kbd>/</kbd>
+        </label>
+        <div id="mt-global-search-results" class="mt-search-results" hidden></div>
+      </div>
       <div class="mt-countdown ${urgencyClass}">
         <span class="n">${days >= 0 ? days : 0}</span>
         <span class="lbl">Days Left</span>
@@ -828,6 +948,7 @@ function dashboardCtx() {
     getCoachSummary,
     getGreeting,
     renderFocusDoneButton,
+    recentlyDismissedFocus,
     getFunStat
   };
 }
@@ -925,7 +1046,8 @@ function tasksCtx() {
     getDynamicCalendarRange,
     getMoveTimelinePhases,
     isDiyMove,
-    isHouseMove
+    isHouseMove,
+    borough: getMoveProfile().borough || 'manhattan'
   };
 }
 
@@ -1005,7 +1127,9 @@ function dayOfCtx() {
     esc,
     renderMoveStyleGuidanceCard,
     renderBuildingGuidanceCard,
-    getMoverTipSummary
+    getMoverTipSummary,
+    daysUntilMove,
+    deadlineItems: window.MovingDeadlines.getDeadlineItems(deadlineCtx())
   };
 }
 
@@ -1044,10 +1168,49 @@ function render() {
     <div class="mt-main-content">
       ${renderHeader()}
       <div class="mt-scroll-body">${body}</div>
+      ${renderMobileQuickActions()}
     </div>
   `;
   attachHandlers();
   scrollActiveNavIntoView();
+  revealPendingSearchMatch(root);
+}
+
+function renderMobileQuickActions() {
+  if (state.activeTab === 'boxes') {
+    return `<nav class="mt-mobile-quickbar" aria-label="Quick actions"><button data-tab-jump="dashboard">🏠 Today</button><button data-mobile-box-action="add">➕ Add box</button><button data-mobile-box-action="search">🔎 Find box</button></nav>`;
+  }
+  return `<nav class="mt-mobile-quickbar" aria-label="Quick actions"><button data-tab-jump="dashboard">🏠 Today</button><button data-tab-jump="boxes">🏷️ Boxes</button></nav>`;
+}
+
+function revealPendingSearchMatch(root) {
+  if (!pendingSearchMatch || !root || typeof root.querySelectorAll !== 'function') return;
+  const searchMatch = pendingSearchMatch;
+  pendingSearchMatch = null;
+  const term = searchMatch.query.toLowerCase();
+  const exactText = searchMatch.text.toLowerCase();
+  const candidates = [...root.querySelectorAll('.mt-scroll-body .mt-item-text, .mt-scroll-body li, .mt-scroll-body p, .mt-scroll-body h3')];
+  const match = candidates.find(el => (el.textContent || '').trim().toLowerCase() === exactText)
+    || candidates.find(el => (el.textContent || '').toLowerCase().includes(term));
+  if (!match) return;
+  const escapedTerms = searchMatch.query.trim().split(/\s+/).filter(Boolean).map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (escapedTerms.length && match.childElementCount === 0) {
+    const expression = new RegExp(`(${escapedTerms.join('|')})`, 'gi');
+    match.innerHTML = esc(match.textContent).replace(expression, '<mark class="mt-search-word">$1</mark>');
+  }
+  match.classList.add('mt-search-highlight');
+  const reveal = () => {
+    if (typeof match.scrollIntoView === 'function') match.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    const scrollBody = match.closest && match.closest('.mt-scroll-body');
+    if (scrollBody && match.getBoundingClientRect && scrollBody.getBoundingClientRect) {
+      const matchRect = match.getBoundingClientRect();
+      const bodyRect = scrollBody.getBoundingClientRect();
+      scrollBody.scrollTop += matchRect.top - bodyRect.top - (bodyRect.height / 2) + (matchRect.height / 2);
+    }
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(reveal));
+  else reveal();
+  setTimeout(() => match.classList.remove('mt-search-highlight'), 3200);
 }
 
 function scrollActiveNavIntoView() {
@@ -1061,6 +1224,57 @@ function scrollActiveNavIntoView() {
 
 function attachHandlers() {
   const root = document.getElementById('move-tracker-root');
+
+  const searchInput = root.querySelector('#mt-global-search-input');
+  const searchResults = root.querySelector('#mt-global-search-results');
+  if (searchInput && searchResults) {
+    const showSearchResults = () => {
+      const query = searchInput.value.trim();
+      if (!query) {
+        searchResults.hidden = true;
+        searchResults.innerHTML = '';
+        return;
+      }
+      const results = searchMovingAssistant(query);
+      searchResults.innerHTML = results.length
+        ? results.map((result, index) => `
+            <button type="button" data-search-result="${index}" data-search-tab="${result.tab}" data-search-term="${encodeAttrData(query)}" data-search-text="${encodeAttrData(result.text)}">
+              <span>${esc(result.group)}</span><strong>${esc(result.text)}</strong>
+            </button>
+          `).join('')
+        : '<div class="mt-search-empty">No matches. Try a shorter word.</div>';
+      searchResults.hidden = false;
+      searchResults.querySelectorAll('[data-search-result]').forEach(button => {
+        button.addEventListener('click', () => {
+          pendingSearchMatch = {
+            query: decodeAttrData(button.getAttribute('data-search-term')),
+            text: decodeAttrData(button.getAttribute('data-search-text'))
+          };
+          state.activeTab = button.getAttribute('data-search-tab') || 'dashboard';
+          AppEngine.saveState(state);
+          render();
+        });
+      });
+    };
+    searchInput.addEventListener('input', showSearchResults);
+    searchInput.addEventListener('focus', showSearchResults);
+    searchInput.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { searchResults.hidden = true; searchInput.blur(); }
+      if (event.key === 'Enter') {
+        const first = searchResults.querySelector('[data-search-result]');
+        if (first) first.click();
+      }
+    });
+  }
+  if (typeof document.addEventListener === 'function') {
+    document.onkeydown = event => {
+      const tag = event.target && event.target.tagName;
+      if (event.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA' && searchInput) {
+        event.preventDefault();
+        searchInput.focus();
+      }
+    };
+  }
   
   const gearBtn = root.querySelector('#mt-gear-settings');
   if (gearBtn) gearBtn.addEventListener('click', () => { state.showWizardOverride = true; render(); });
@@ -1089,6 +1303,10 @@ function attachHandlers() {
       const calendar = window.MovingDeadlines.buildCalendarFile(deadlineCtx());
       downloadTextFile(`moving-assistant-deadlines-${dateStamp}.ics`, calendar, 'text/calendar');
     });
+  });
+
+  root.querySelectorAll('[data-print-move-packet]').forEach(btn => {
+    btn.addEventListener('click', () => window.print());
   });
 
   const importBtn = root.querySelector('#mt-import-backup');
@@ -1151,6 +1369,17 @@ function attachHandlers() {
     });
   });
 
+  root.querySelectorAll('[data-mobile-box-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.getAttribute('data-mobile-box-action');
+      const target = root.querySelector(action === 'add' ? '#mt-box-add-card' : '#mt-box-search');
+      if (!target) return;
+      if (typeof target.scrollIntoView === 'function') target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const input = action === 'add' ? root.querySelector('#mt-box-label') : target;
+      if (input && typeof input.focus === 'function') input.focus();
+    });
+  });
+
   root.querySelectorAll('[data-focus-open]').forEach(btn => {
     btn.addEventListener('click', () => {
       state.activeTab = btn.getAttribute('data-focus-open') || 'dashboard';
@@ -1158,6 +1387,33 @@ function attachHandlers() {
       render();
     });
   });
+
+  root.querySelectorAll('[data-focus-dismiss]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-focus-id');
+      const mode = btn.getAttribute('data-focus-dismiss');
+      if (!id || !['snoozed', 'not-relevant'].includes(mode)) return;
+      if (!state.dismissedFocusItems) state.dismissedFocusItems = {};
+      const previous = state.dismissedFocusItems[id] || null;
+      const until = mode === 'snoozed' ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
+      state.dismissedFocusItems[id] = { mode, until };
+      recentlyDismissedFocus = { id, previous };
+      AppEngine.saveState(state);
+      render();
+    });
+  });
+
+  const undoFocusDismiss = root.querySelector('#mt-focus-dismiss-undo');
+  if (undoFocusDismiss) {
+    undoFocusDismiss.addEventListener('click', () => {
+      if (!recentlyDismissedFocus) return;
+      if (recentlyDismissedFocus.previous) state.dismissedFocusItems[recentlyDismissedFocus.id] = recentlyDismissedFocus.previous;
+      else delete state.dismissedFocusItems[recentlyDismissedFocus.id];
+      recentlyDismissedFocus = null;
+      AppEngine.saveState(state);
+      render();
+    });
+  }
 
   root.querySelectorAll('[data-focus-complete]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1240,11 +1496,13 @@ function attachHandlers() {
   }
 
   root.querySelectorAll('[data-savings-field]').forEach(input => {
-    input.addEventListener('input', () => {
-      if (!state.savings) state.savings = { depositAmount: '', moverHourlyRate: '', avoidedMoverHours: '1', reusedBoxes: '', avoidedDuplicateBuys: '' };
-      state.savings[input.getAttribute('data-savings-field')] = input.value;
+    const updateSavings = () => {
+      if (!state.savings) state.savings = {};
+      state.savings[input.getAttribute('data-savings-field')] = input.type === 'checkbox' ? input.checked : input.value;
       AppEngine.saveState(state);
-    });
+    };
+    input.addEventListener('input', updateSavings);
+    if (input.type === 'checkbox' || input.type === 'date') input.addEventListener('change', () => { updateSavings(); render(); });
     input.addEventListener('blur', () => render());
   });
 

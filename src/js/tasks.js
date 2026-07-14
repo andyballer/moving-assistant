@@ -70,7 +70,9 @@ window.MovingTasks = (function() {
       summary: 'Your risk is vague scope. Make every access detail and fee visible before move day.',
       items: [
         'Compare written quotes using the same inventory, dates, stairs, elevator windows, and long-carry details.',
+        'Send photos or a video walkthrough of every room and large item so the crew size, truck, and time estimate match the real move.',
         'Confirm what is included: materials, furniture wrapping, disassembly, COI, travel time, tolls, and cancellation terms.',
+        'Ask what must be emptied, wrapped, or disassembled before arrival; dresser and cabinet rules vary by mover and access path.',
         'Send building rules and access notes to the mover as soon as you book.',
         'Call during move week to confirm arrival window, crew size, truck access, and payment/tip plan.'
       ]
@@ -100,6 +102,31 @@ window.MovingTasks = (function() {
     return renderGuidanceCard(ctx, getBuildingGuidance(ctx), 'mt-building-guidance');
   }
 
+  function getBoroughGuidance(ctx) {
+    const labels = { manhattan: 'Manhattan', brooklyn: 'Brooklyn', queens: 'Queens', bronx: 'Bronx', 'staten-island': 'Staten Island' };
+    const borough = ctx.borough || 'manhattan';
+    const isManhattan = borough === 'manhattan';
+    return {
+      title: `${labels[borough] || 'NYC'} curb + truck check`,
+      summary: isManhattan
+        ? 'Manhattan includes special Midtown and Lower Manhattan commercial-vehicle rules. Make the mover verify the exact curb and route instead of assuming a normal parking space will work.'
+        : 'NYC curb rules are sign-specific and truck routes matter in every borough. Treat the address—not the borough name—as the final answer.',
+      items: [
+        'Photograph the curb signs at both addresses for the exact move-day hours and restrictions.',
+        'Ask the mover where the truck will legally load; NYC loading zones and No Parking areas can allow active loading, while No Standing rules are different.',
+        isManhattan
+          ? 'Ask specifically whether Midtown or Lower Manhattan commercial-vehicle rules affect the truck, standing time, or route.'
+          : 'Confirm the truck route to the destination; commercial vehicles cannot use NYC parkways and must follow posted restrictions.',
+        'Recheck alternate-side suspensions and emergency changes close to move day; never rely on an old screenshot.'
+      ]
+    };
+  }
+
+  function renderBoroughGuidanceCard(ctx) {
+    const card = renderGuidanceCard(ctx, getBoroughGuidance(ctx), 'mt-borough-guidance');
+    return `${card}<p class="mt-source-links">Official checks: <a href="https://www.nyc.gov/html/dot/html/motorist/parking-regulations.shtml" target="_blank" rel="noopener noreferrer">parking rules</a> · <a href="https://www.nyc.gov/html/dot/html/motorist/loading-zones.shtml" target="_blank" rel="noopener noreferrer">loading zones</a> · <a href="https://www.nyc.gov/html/dot/html/motorist/trucks.shtml" target="_blank" rel="noopener noreferrer">truck routes</a></p>`;
+  }
+
   function renderTasks(ctx) {
     return `
       ${ctx.isHouseMove() ? `
@@ -116,6 +143,7 @@ window.MovingTasks = (function() {
       </div>
       ${renderMoveStyleGuidanceCard(ctx)}
       ${renderBuildingGuidanceCard(ctx)}
+      ${renderBoroughGuidanceCard(ctx)}
       ${renderPhaseList(ctx, ctx.getMoveTimelinePhases())}
     `;
   }
@@ -123,6 +151,7 @@ window.MovingTasks = (function() {
   return {
     renderPhaseList,
     renderBuildingGuidanceCard,
+    renderBoroughGuidanceCard,
     renderMoveStyleGuidanceCard,
     renderTasks
   };

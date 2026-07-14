@@ -38,22 +38,38 @@ window.MovingDeadlines = (function() {
     return 'later';
   }
 
+  function createDatedItem(ctx, input) {
+    if (!input || !input.dueDate) return null;
+    const days = ctx.daysUntilDate(input.dueDate);
+    if (!Number.isFinite(days)) return null;
+    const source = input.source || 'move';
+    const status = input.status || (days < 0 ? 'overdue' : 'scheduled');
+    return {
+      id: input.id || `${source}-${input.dueDate}-${String(input.shortLabel || input.label || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`,
+      dueDate: input.dueDate,
+      status,
+      source,
+      cost: Number.isFinite(input.cost) ? input.cost : null,
+      shortLabel: input.shortLabel || input.label,
+      label: input.label || input.shortLabel,
+      detail: input.detail || '',
+      tab: input.tab || 'dashboard',
+      days,
+      dueLabel: getDueLabel(ctx, input.dueDate),
+      dateLabel: formatShortDate(input.dueDate),
+      tone: getDueTone(ctx, input.dueDate),
+      // Compatibility aliases while existing consumers migrate to the shared shape.
+      date: input.dueDate,
+      kind: source
+    };
+  }
+
   function getDeadlineItems(ctx) {
     const { state, AppEngine } = ctx;
     const items = [];
-    const addItem = ({ date, label, detail, tab, kind }) => {
-      if (!date) return;
-      items.push({
-        date,
-        label,
-        detail,
-        tab,
-        kind,
-        days: ctx.daysUntilDate(date),
-        dueLabel: getDueLabel(ctx, date),
-        dateLabel: formatShortDate(date),
-        tone: getDueTone(ctx, date)
-      });
+    const addItem = ({ date, label, shortLabel, detail, tab, kind, status, cost, id }) => {
+      const item = createDatedItem(ctx, { id, dueDate: date, label, shortLabel, detail, tab, source: kind, status, cost });
+      if (item) items.push(item);
     };
 
     addItem({
@@ -77,6 +93,20 @@ window.MovingDeadlines = (function() {
       tab: 'dayof',
       kind: 'first-week'
     });
+    const savings = state.savings || {};
+    if (savings.depositReturnDueDate && !savings.depositReturned) {
+      const depositAmount = parseFloat(savings.depositAmount);
+      addItem({
+        date: savings.depositReturnDueDate,
+        label: 'Security deposit return due',
+        shortLabel: 'Deposit return',
+        detail: 'Follow up if payment or an itemized deduction notice has not arrived',
+        tab: 'savings',
+        kind: 'money',
+        cost: Number.isFinite(depositAmount) && depositAmount > 0 ? depositAmount : null,
+        id: `deposit-return-${savings.depositReturnDueDate}`
+      });
+    }
     addItem({
       date: addDaysToDateStr(state.targetMoveDate, -7),
       label: ctx.isDiyMove() ? 'Confirm vehicle and helpers' : 'Confirm movers',
@@ -118,7 +148,7 @@ window.MovingDeadlines = (function() {
   }
 
   function getUpcomingDeadlines(ctx) {
-    return getDeadlineItems(ctx).slice(0, 10);
+    return getDeadlineItems(ctx).filter(item => item.status !== 'completed').slice(0, 10);
   }
 
   function formatIcsDate(dateStr) {
@@ -145,16 +175,16 @@ window.MovingDeadlines = (function() {
     ];
 
     getDeadlineItems(ctx).forEach((item, idx) => {
-      if (!item.date) return;
-      const date = formatIcsDate(item.date);
-      const uid = `moving-assistant-${item.kind || 'deadline'}-${date}-${idx}@local`;
+      if (!item.dueDate) return;
+      const date = formatIcsDate(item.dueDate);
+      const uid = `moving-assistant-${item.source || 'deadline'}-${date}-${idx}@local`;
       lines.push(
         'BEGIN:VEVENT',
         `UID:${uid}`,
         `DTSTAMP:${stamp}`,
         `DTSTART;VALUE=DATE:${date}`,
-        `SUMMARY:${escapeIcsText(item.label)}`,
-        `DESCRIPTION:${escapeIcsText(item.detail || item.kind || 'Moving Assistant deadline')}`,
+        `SUMMARY:${escapeIcsText(item.shortLabel || item.label)}`,
+        `DESCRIPTION:${escapeIcsText(item.detail || item.source || 'Moving Assistant deadline')}`,
         'END:VEVENT'
       );
     });
@@ -166,6 +196,7 @@ window.MovingDeadlines = (function() {
   return {
     addDaysToDateStr,
     buildCalendarFile,
+    createDatedItem,
     formatShortDate,
     getDueLabel,
     getDueTone,

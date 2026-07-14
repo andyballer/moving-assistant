@@ -1,8 +1,22 @@
 Moving Assistant — Product Update Changelog
 
+2026-07-14
+- Added a trackable security-deposit return date that appears on the Dashboard and in calendar export with the amount at stake, then clears when resolved.
+- Added planned-versus-actual move cost tracking with a clear over/under-budget result.
+- Turned Move Day into a focused run mode with one next action, progress, open-first box visibility, essential-contact readiness, and the full checklist below.
+- Added a print/PDF move packet containing contacts, mover details, open-first inventory, utilities, deadlines, and move notes.
+
+2026-07-12
+- Made the Dashboard switch to first-week closeout guidance after move day instead of continuing to recommend packing work.
+- Added a mobile quick-action bar with persistent Today/Boxes navigation and contextual Add Box/Find Box actions.
+- Increased small mobile action targets to a thumb-friendly minimum height.
+
 2026-07-11
 - Fixed Box Inventory's removed-box undo banner so it clears on reload and backup import, can be dismissed explicitly, and disappears automatically after eight seconds.
 - Unified desktop and mobile navigation around the same Start Here, Work, Apartment, and Reference groups, keeping Costs in Reference on every screen size.
+- Added stable Today focus-item dismissals with one-day snooze, permanent not-relevant controls, and same-session Undo.
+- Added destination borough to Move Profile, sourced NYC curb/truck guidance with a Manhattan-specific commercial-zone warning, and an outer-borough scope note on the built-in mover shortlist.
+- Normalized Dashboard deadlines and calendar exports around a shared dated-item shape with due date, status, source, optional cost, and short label fields.
 
 2026-07-08
 - Reworked the Dashboard into a stronger guided coach surface with current-stage summary, outstanding gap callouts, and a clearer next 10-minute action.

@@ -23,10 +23,12 @@ window.MovingDashboard = (function() {
       getCoachSummary,
       getGreeting,
       renderFocusDoneButton,
+      recentlyDismissedFocus,
       getFunStat
     } = ctx;
 
-    const days = Math.max(0, daysUntilMove());
+    const rawDays = daysUntilMove();
+    const days = Math.max(0, rawDays);
     const total = totalTaskCount();
     const done = doneTaskCount();
     const pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
@@ -53,15 +55,21 @@ window.MovingDashboard = (function() {
 
     return `
       <div class="mt-dashboard-shell">
+        ${recentlyDismissedFocus ? `
+          <div class="mt-box-undo-banner mt-focus-dismiss-banner">
+            <span>Focus item hidden.</span>
+            <button class="mt-mini-action" id="mt-focus-dismiss-undo">Undo</button>
+          </div>
+        ` : ''}
         <div class="mt-hero-card">
-          <div class="mt-dashboard-kicker">${days <= 7 ? 'Move week command center' : 'Move command center'}</div>
+          <div class="mt-dashboard-kicker">${rawDays < 0 ? 'Post-move command center' : days <= 7 ? 'Move week command center' : 'Move command center'}</div>
           <h1>${getGreeting()}, ${esc(state.userName || 'friend')} 👋</h1>
-          <p>${days <= 7 ? 'Home stretch. We are making this annoyingly manageable.' : 'One small win at a time. Cardboard fears you.'}</p>
+          <p>${rawDays < 0 ? 'The truck is done. Now close the loops that protect your money and make the new place work.' : days <= 7 ? 'Home stretch. We are making this annoyingly manageable.' : 'One small win at a time. Cardboard fears you.'}</p>
 
           <div class="mt-coach-panel">
             <div class="mt-coach-main">
               <span class="mt-command-label">Where you should be</span>
-              <strong>${days} day${days === 1 ? '' : 's'} left: ${esc(coach.stage)}</strong>
+              <strong>${rawDays < 0 ? `${Math.abs(rawDays)} day${Math.abs(rawDays) === 1 ? '' : 's'} since move` : `${days} day${days === 1 ? '' : 's'} left`}: ${esc(coach.stage)}</strong>
               <p>${esc(coach.status)} Current phase: ${esc(coach.phase.label)} (${coach.phase.done}/${coach.phase.total} done).</p>
             </div>
             <div class="mt-coach-watch">
@@ -82,6 +90,7 @@ window.MovingDashboard = (function() {
                 <small>${esc(primaryFocus.phase)}</small>
               </button>
               ${renderFocusDoneButton(primaryFocus)}
+              ${primaryFocus.id !== 'all-clear' ? `<div class="mt-focus-dismiss-actions"><button data-focus-dismiss="snoozed" data-focus-id="${esc(primaryFocus.id)}">Tomorrow</button><button data-focus-dismiss="not-relevant" data-focus-id="${esc(primaryFocus.id)}">Not relevant</button></div>` : ''}
             </section>
 
             <section class="mt-up-next-panel">
@@ -94,6 +103,7 @@ window.MovingDashboard = (function() {
                       <small>${esc(item.phase)}</small>
                     </button>
                     ${renderFocusDoneButton(item)}
+                    <div class="mt-focus-dismiss-actions"><button data-focus-dismiss="snoozed" data-focus-id="${esc(item.id)}">Tomorrow</button><button data-focus-dismiss="not-relevant" data-focus-id="${esc(item.id)}">Not relevant</button></div>
                   </div>
                 `).join('') : `
                   <div class="mt-empty mt-dashboard-empty">No other urgent items right now.</div>
@@ -136,8 +146,8 @@ window.MovingDashboard = (function() {
                     <button class="mt-deadline-chip ${esc(item.tone)}" data-focus-open="${esc(item.tab)}">
                       <span class="mt-deadline-date">${esc(item.dateLabel)}</span>
                       <span class="mt-deadline-main">
-                        <strong>${esc(item.label)}</strong>
-                        <small>${esc(item.detail || item.kind)}</small>
+                        <strong>${esc(item.shortLabel || item.label)}</strong>
+                        <small>${esc(item.detail || item.source)}${Number.isFinite(item.cost) ? ` · $${item.cost.toLocaleString()}` : ''}</small>
                       </span>
                       <em>${esc(item.dueLabel)}</em>
                     </button>
@@ -152,8 +162,8 @@ window.MovingDashboard = (function() {
 
         <div class="mt-dashboard-metrics">
           <div class="mt-card mt-dashboard-metric-card">
-            <div class="mt-dashboard-metric-value">${days}</div>
-            <div class="mt-metric-label">Days left</div>
+            <div class="mt-dashboard-metric-value">${rawDays < 0 ? Math.abs(rawDays) : days}</div>
+            <div class="mt-metric-label">${rawDays < 0 ? 'Days settled' : 'Days left'}</div>
           </div>
           <div class="mt-card mt-dashboard-metric-card">
             <div class="mt-dashboard-metric-value">${packedRooms}/${AppEngine.ROOMS.length}</div>

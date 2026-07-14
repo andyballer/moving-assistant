@@ -89,6 +89,79 @@ test('JavaScript files compile', () => {
   });
 });
 
+test('community moving tips are integrated into planning and move day', () => {
+  const MovingApp = loadStateModule();
+  const allTips = MovingApp.MOVE_TIPS.join(' ');
+  const moveDay = MovingApp.MOVE_DAY_STAGES.flatMap((stage) => stage.items).join(' ');
+  const timeline = MovingApp.TIMELINE_DATA_MATRIX.flatMap((phase) => phase.items).join(' ');
+
+  assert.match(allTips, /room color or number/i);
+  assert.match(allTips, /Photograph each open box/i);
+  assert.match(allTips, /heavy items in small boxes/i);
+  assert.match(allTips, /Reuse your shoeboxes for glassware/i);
+  assert.match(allTips, /trash bag up around each bundle/i);
+  assert.match(moveDay, /cleaning kit/i);
+  assert.match(moveDay, /make the bed first/i);
+  assert.match(moveDay, /meet the crew at the destination/i);
+  assert.match(timeline, /furniture hardware/i);
+  assert.match(timeline, /reusable-bin rental/i);
+  assert.match(read('src/js/dayof.js'), /reddit\.com\/r\/lifehacks\/comments\/sma1rc/);
+  assert.match(read('src/js/dayof.js'), /reddit\.com\/r\/AskNYC\/comments\/apcsvt/);
+});
+
+test('kitchen donation guide explains how to decide on old cookware', () => {
+  const MovingApp = loadStateModule();
+  const kitchenGuide = MovingApp.DONATION_GUIDE.Kitchen.join(' ');
+  assert.match(kitchenGuide, /Old cookware decision/i);
+  assert.match(kitchenGuide, /untouched for a year/i);
+  assert.match(kitchenGuide, /peeling\/chipped nonstick coating/i);
+});
+
+test('global search indexes guidance and opens matching sections', () => {
+  const appJs = read('src/js/app.js');
+  assert.match(appJs, /function searchMovingAssistant\(query\)/);
+  assert.match(appJs, /AppEngine\.MOVE_TIPS/);
+  assert.match(appJs, /state\.boxes/);
+  assert.match(appJs, /data-search-tab/);
+  assert.match(appJs, /data-search-text/);
+  assert.match(appJs, /revealPendingSearchMatch/);
+  assert.match(appJs, /mt-search-word/);
+
+  const html = renderAppWithState({
+    userName: 'Test', targetMoveDate: '2026-08-15', activeTab: 'dashboard',
+    moveProfile: { apartmentHunt: true, moveStyle: 'movers', buildingType: 'apartment' }
+  });
+  assert.match(html, /id="mt-global-search-input"/);
+  assert.match(html, /placeholder="Search everything/);
+});
+
+test('post-move dashboard prioritizes first-week closeout instead of packing', () => {
+  const html = renderAppWithState({
+    userName: 'Test', targetMoveDate: '2020-01-01', activeTab: 'dashboard',
+    moveProfile: { apartmentHunt: true, moveStyle: 'movers', buildingType: 'apartment' }
+  });
+  assert.match(html, /Post-move command center/);
+  assert.match(html, /first-week closeout and settling in/i);
+  assert.doesNotMatch(html, /Pack \/ confirm your open-first essentials box/);
+});
+
+test('mobile quick actions expose Today and contextual box actions', () => {
+  const dashboard = renderAppWithState({
+    userName: 'Test', targetMoveDate: '2026-08-15', activeTab: 'dashboard',
+    moveProfile: { apartmentHunt: true, moveStyle: 'movers', buildingType: 'apartment' }
+  });
+  assert.match(dashboard, /mt-mobile-quickbar/);
+  assert.match(dashboard, /data-tab-jump="boxes"/);
+
+  const boxes = renderAppWithState({
+    userName: 'Test', targetMoveDate: '2026-08-15', activeTab: 'boxes',
+    moveProfile: { apartmentHunt: true, moveStyle: 'movers', buildingType: 'apartment' }
+  });
+  assert.match(boxes, /data-mobile-box-action="add"/);
+  assert.match(boxes, /data-mobile-box-action="search"/);
+  assert.match(boxes, /id="mt-box-add-card"/);
+});
+
 test('HTML loads app scripts in dependency order', () => {
   const html = read('index.html');
   const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((match) => match[1]);
@@ -138,7 +211,8 @@ test('service worker caches every local shell asset', () => {
 test('navigation tabs and state-valid tabs stay in sync', () => {
   const appJs = read('src/js/app.js');
   const MovingApp = loadStateModule();
-  const sectionIds = [...appJs.matchAll(/\{\s*id: '([^']+)'/g)].map((match) => match[1]);
+  const appSectionsSource = appJs.match(/const appSections = \[([\s\S]*?)\n\];/)[1];
+  const sectionIds = [...appSectionsSource.matchAll(/\{\s*id: '([^']+)'/g)].map((match) => match[1]);
 
   assert.deepEqual(new Set(sectionIds), new Set(sameRealm(MovingApp.TAB_IDS)));
   assert.equal(sectionIds[0], 'dashboard');
@@ -173,7 +247,8 @@ test('default state has the expected core shape', () => {
   assert.deepEqual(sameRealm(state.moveProfile), {
     apartmentHunt: true,
     moveStyle: 'movers',
-    buildingType: 'apartment'
+    buildingType: 'apartment',
+    borough: 'manhattan'
   });
   assert.deepEqual(Object.keys(state.utilities), sameRealm(MovingApp.UTILITIES));
   assert.deepEqual(Object.keys(state.rooms), sameRealm(MovingApp.ROOMS));
@@ -278,7 +353,8 @@ test('sanitizeState normalizes move profile applicability fields', () => {
   assert.deepEqual(sameRealm(sanitized.moveProfile), {
     apartmentHunt: false,
     moveStyle: 'diy',
-    buildingType: 'house'
+    buildingType: 'house',
+    borough: 'manhattan'
   });
 
   const fallback = MovingApp.sanitizeState({
@@ -292,8 +368,64 @@ test('sanitizeState normalizes move profile applicability fields', () => {
   assert.deepEqual(sameRealm(fallback.moveProfile), {
     apartmentHunt: true,
     moveStyle: 'movers',
-    buildingType: 'apartment'
+    buildingType: 'apartment',
+    borough: 'manhattan'
   });
+});
+
+test('borough changes sourced curb guidance and mover shortlist scope', () => {
+  const base = {
+    userName: 'Test', targetMoveDate: '2026-08-15', aptSize: '1br',
+    moveProfile: { apartmentHunt: false, moveStyle: 'movers', buildingType: 'apartment' }
+  };
+  const manhattanTasks = renderAppWithState({ ...base, activeTab: 'tasks', moveProfile: { ...base.moveProfile, borough: 'manhattan' } });
+  assert.match(manhattanTasks, /Manhattan curb \+ truck check/);
+  assert.match(manhattanTasks, /Midtown or Lower Manhattan/);
+  assert.match(manhattanTasks, /nyc\.gov\/html\/dot\/html\/motorist\/loading-zones/);
+
+  const queensTasks = renderAppWithState({ ...base, activeTab: 'tasks', moveProfile: { ...base.moveProfile, borough: 'queens' } });
+  assert.match(queensTasks, /Queens curb \+ truck check/);
+  assert.match(queensTasks, /commercial vehicles cannot use NYC parkways/);
+  assert.doesNotMatch(queensTasks, /Midtown or Lower Manhattan commercial-vehicle rules affect/);
+
+  const queensMovers = renderAppWithState({ ...base, activeTab: 'movers', moveProfile: { ...base.moveProfile, borough: 'queens' } });
+  assert.match(queensMovers, /these defaults lean Manhattan and close-borough apartment moves/);
+});
+
+test('focus item dismissals sanitize valid snooze and not-relevant records', () => {
+  const MovingApp = loadStateModule();
+  const sanitized = MovingApp.sanitizeState({
+    dismissedFocusItems: {
+      box: { mode: 'snoozed', until: '2099-01-01T00:00:00.000Z' },
+      backup: { mode: 'not-relevant', until: 'ignored' },
+      room: { mode: 'unknown', until: null }
+    }
+  });
+  assert.deepEqual(sameRealm(sanitized.dismissedFocusItems), {
+    box: { mode: 'snoozed', until: '2099-01-01T00:00:00.000Z' },
+    backup: { mode: 'not-relevant', until: null }
+  });
+});
+
+test('dashboard respects stable snoozed and not-relevant focus ids independently', () => {
+  const base = {
+    userName: 'Test', targetMoveDate: '2026-08-15', activeTab: 'dashboard',
+    moveProfile: { apartmentHunt: false, moveStyle: 'movers', buildingType: 'apartment' }
+  };
+  const normal = renderAppWithState(base);
+  assert.match(normal, /data-focus-id="timeline-phase"/);
+  assert.match(normal, /data-focus-id="box"/);
+
+  const dismissed = renderAppWithState({
+    ...base,
+    dismissedFocusItems: {
+      'timeline-phase': { mode: 'snoozed', until: '2099-01-01T00:00:00.000Z' },
+      box: { mode: 'not-relevant', until: null }
+    }
+  });
+  assert.doesNotMatch(dismissed, /data-focus-id="timeline-phase"/);
+  assert.doesNotMatch(dismissed, /data-focus-id="box"/);
+  assert.match(dismissed, /data-focus-id="backup"/);
 });
 
 test('building type changes task guidance', () => {
@@ -463,6 +595,23 @@ test('move day includes first-week follow-up checklist', () => {
   assert.match(html, /Return rented modem\/router\/cable boxes/);
 });
 
+test('move day opens with one focused action and a printable move packet', () => {
+  const html = renderAppWithState({
+    userName: 'Test', targetMoveDate: '2026-08-15', aptSize: '1br', activeTab: 'dayof',
+    moveProfile: { apartmentHunt: false, moveStyle: 'movers', buildingType: 'apartment', borough: 'manhattan' },
+    contacts: { movers: 'Crew 555-0100', doorman: 'Old super', newSuper: 'New super', emergency: 'Backup person' },
+    boxes: [{ id: 'box-1', label: 'First Night', room: 'Bedroom', contents: ['sheets', 'charger'], openFirst: true, fragile: false, status: 'packed' }],
+    notes: 'Freight elevator at 9am'
+  });
+  assert.match(html, /Focused run mode/);
+  assert.match(html, /Do this now/);
+  assert.match(html, /data-print-move-packet="true"/);
+  assert.match(html, /class="mt-move-packet"/);
+  assert.match(html, /First Night/);
+  assert.match(html, /Crew 555-0100/);
+  assert.match(html, /Freight elevator at 9am/);
+});
+
 test('supplies renders extracted forecast markup', () => {
   const html = renderAppWithState({
     schemaVersion: 13,
@@ -489,6 +638,8 @@ test('savings helper calculates avoidable cost ranges', () => {
   const savings = context.window.MovingSavings.estimateSavings({
     savings: {
       depositAmount: '4000',
+      plannedMoveCost: '2500',
+      actualMoveCost: '2200',
       moverHourlyRate: '225',
       avoidedMoverHours: '1.5',
       reusedBoxes: '20',
@@ -504,8 +655,34 @@ test('savings helper calculates avoidable cost ranges', () => {
     moverSavings: 338,
     boxSavings: 50,
     avoidedDuplicateBuys: 80,
-    hasInputs: true
+    hasInputs: true,
+    plannedMoveCost: 2500,
+    actualMoveCost: 2200,
+    costVariance: 300
   });
+});
+
+test('deposit return deadline carries its amount and disappears when resolved', () => {
+  const context = { window: {} };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext(read('src/js/deadlines.js'), context, { filename: 'src/js/deadlines.js' });
+  const baseCtx = {
+    state: {
+      targetMoveDate: '2026-08-15', apartments: [], utilities: {},
+      savings: { depositAmount: '3500', depositReturnDueDate: '2026-09-01', depositReturned: false }
+    },
+    AppEngine: { UTILITIES: [] },
+    daysUntilDate: dateStr => Math.ceil((new Date(`${dateStr}T00:00:00`) - new Date('2026-08-10T00:00:00')) / 86400000),
+    getMoveDayOfWeek: () => 'Saturday', needsApartmentHunt: () => false, isDiyMove: () => false
+  };
+  const deposit = context.window.MovingDeadlines.getDeadlineItems(baseCtx).find(item => item.id.startsWith('deposit-return-'));
+  assert.equal(deposit.shortLabel, 'Deposit return');
+  assert.equal(deposit.cost, 3500);
+  assert.equal(deposit.tab, 'savings');
+
+  baseCtx.state.savings.depositReturned = true;
+  assert.equal(context.window.MovingDeadlines.getDeadlineItems(baseCtx).some(item => item.id.startsWith('deposit-return-')), false);
 });
 
 test('deadline helper calculates shared deadline items', () => {
@@ -537,6 +714,15 @@ test('deadline helper calculates shared deadline items', () => {
     needsApartmentHunt() { return false; },
     isDiyMove() { return false; }
   });
+
+  const moveDay = items.find(item => item.source === 'move');
+  assert.equal(moveDay.dueDate, '2026-08-15');
+  assert.equal(moveDay.status, 'scheduled');
+  assert.equal(moveDay.shortLabel, 'Move day');
+  assert.equal(moveDay.cost, null);
+  assert.match(moveDay.id, /^move-2026-08-15-/);
+  assert.equal(moveDay.date, moveDay.dueDate);
+  assert.equal(moveDay.kind, moveDay.source);
 
   assert.equal(deadlines.addDaysToDateStr('2026-08-15', -7), '2026-08-08');
   assert.equal(deadlines.formatShortDate('2026-08-15'), 'Aug 15');

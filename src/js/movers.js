@@ -17,11 +17,13 @@ window.MovingMovers = (function() {
     const { tip, perMover, totalTip } = getMoverTipSummary(ctx);
     const sizeLabels = { studio: 'studio', '1br': '1BR', '2br': '2BR', '3br': '3BR' };
     const moveSize = state.aptSize || '1br';
+    const borough = state.moveProfile?.borough || 'manhattan';
     const sizeLabel = sizeLabels[moveSize] || '1BR';
     return `
       <div class="mt-alert-box">
         <strong>Planning estimate:</strong> prices below are rough local NYC apartment-move ranges for a ${esc(sizeLabel)} before packing add-ons, storage, specialty items, parking surprises, or insurance upgrades. Get written quotes and verify live reviews before booking.
       </div>
+      ${borough !== 'manhattan' ? `<div class="mt-alert-box"><strong>Shortlist scope:</strong> these defaults lean Manhattan and close-borough apartment moves. For ${esc({ brooklyn: 'Brooklyn', queens: 'Queens', bronx: 'the Bronx', 'staten-island': 'Staten Island' }[borough] || 'your borough')}, compare them with locally based quotes and confirm travel time, tolls, route, and service area in writing.</div>` : ''}
 
       <div class="mt-card mt-mover-budget-card">
         <div class="mt-card-header"><h3>Tip + total assumptions</h3></div>
