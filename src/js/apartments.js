@@ -519,6 +519,16 @@ window.MovingApartments = (function() {
       ? list.filter(a => a.favorite)
       : (filter === 'followup' ? needsFollowUp : list);
     const maxTargetRent = parseFloat(state.targetBudgetMax) || 0;
+    const apartmentProfile = state.apartmentProfile || AppEngine.defaultApartmentProfile();
+    const space = apartmentProfile.currentSpace || {};
+    const mustHaves = apartmentProfile.mustHaves || {};
+    const preferences = apartmentProfile.preferences || {};
+    const area = (width, length) => Math.round(((parseFloat(width) || 0) * (parseFloat(length) || 0)) / 144);
+    const mustHaveLabels = {
+      fullKitchen: 'Full kitchen', dishwasher: 'Dishwasher', queenBed: 'Queen bed', smallDesk: 'Small desk',
+      smallDiningTable: 'Small table + chair', coffeeTable: 'Coffee table', lShapeCouch: 'Decent L-shaped couch',
+      tv: 'TV setup', coatShoeLanding: 'Shoes + coats landing space'
+    };
 
     const cards = visibleList.length ? visibleList.slice().reverse().map((a) => {
       const i = list.indexOf(a);
@@ -619,6 +629,29 @@ window.MovingApartments = (function() {
     }).join('') : `<div class="mt-empty">${filter === 'favorites' ? 'No favorites yet — tap ☆ on a listing to save it here.' : 'No apartments logged yet.'}</div>`;
 
     return `
+      <div class="mt-card mt-apartment-profile">
+        <div class="mt-card-header"><h3>My apartment fit profile</h3><span class="mt-badge mt-badge-optimal">Learning profile</span></div>
+        <div class="mt-card-body">
+          <p class="mt-muted-copy">Use this as the baseline when reviewing listings. Measurements are in inches; calculated areas are comparison guides, not total apartment square footage.</p>
+          <div class="mt-profile-space-grid">
+            <fieldset><legend>Bedroom · ${area(space.bedroomWidthIn, space.bedroomLengthIn)} sq ft</legend><label>Width<input type="number" data-profile-space="bedroomWidthIn" value="${esc(space.bedroomWidthIn)}" /></label><label>Length<input type="number" data-profile-space="bedroomLengthIn" value="${esc(space.bedroomLengthIn)}" /></label></fieldset>
+            <fieldset><legend>Living + kitchen · ${area(space.livingKitchenWidthIn, space.livingKitchenLengthIn)} sq ft</legend><label>Width<input type="number" data-profile-space="livingKitchenWidthIn" value="${esc(space.livingKitchenWidthIn)}" /></label><label>Length<input type="number" data-profile-space="livingKitchenLengthIn" value="${esc(space.livingKitchenLengthIn)}" /></label></fieldset>
+            <fieldset><legend>Living zone only · ${area(space.livingOnlyWidthIn, space.livingOnlyLengthIn)} sq ft</legend><label>Width<input type="number" data-profile-space="livingOnlyWidthIn" value="${esc(space.livingOnlyWidthIn)}" /></label><label>Length<input type="number" data-profile-space="livingOnlyLengthIn" value="${esc(space.livingOnlyLengthIn)}" /></label></fieldset>
+          </div>
+          <div class="mt-profile-must-haves">
+            ${Object.entries(mustHaveLabels).map(([key, label]) => `<label><input type="checkbox" data-profile-must-have="${key}" ${mustHaves[key] ? 'checked' : ''} /> ${label}</label>`).join('')}
+          </div>
+          <div class="mt-profile-preferences">
+            <label><input type="checkbox" data-profile-preference="laundryInBuilding" ${preferences.laundryInBuilding ? 'checked' : ''} /> Laundry in building preferred</label>
+            <label><input type="checkbox" data-profile-preference="preferNoInUnitLaundry" ${preferences.preferNoInUnitLaundry ? 'checked' : ''} /> Prefer no in-unit laundry</label>
+            <label class="mt-profile-lease">Maximum lease <input type="number" min="1" data-profile-preference-number="maxLeaseMonths" value="${esc(preferences.maxLeaseMonths || 12)}" /> months</label>
+            <label>Comfortable max $<input type="number" min="1" data-profile-preference-number="comfortableBudgetMax" value="${esc(preferences.comfortableBudgetMax || 4250)}" /></label>
+            <label>Stretch max $<input type="number" min="1" data-profile-preference-number="stretchBudgetMax" value="${esc(preferences.stretchBudgetMax || 4500)}" /></label>
+          </div>
+          <label class="mt-apt-notes-label">Search brief<textarea data-profile-text="preferenceNotes">${esc(apartmentProfile.preferenceNotes || '')}</textarea></label>
+          <label class="mt-apt-notes-label">What I am learning from listings<textarea data-profile-text="learnedSignals">${esc(apartmentProfile.learnedSignals || '')}</textarea></label>
+        </div>
+      </div>
       ${renderApartmentPipeline(ctx, list)}
       <div class="mt-income-wrapper">
         <label>Target Budget Range ($/mo):</label>
@@ -653,6 +686,47 @@ window.MovingApartments = (function() {
 
   function attachHandlers(ctx) {
     const { root, state, AppEngine, render } = ctx;
+
+    root.querySelectorAll('[data-profile-space]').forEach(input => {
+      input.addEventListener('change', () => {
+        const key = input.getAttribute('data-profile-space');
+        const value = parseFloat(input.value);
+        if (!Number.isFinite(value) || value <= 0) return;
+        state.apartmentProfile.currentSpace[key] = value;
+        AppEngine.saveState(state);
+        render();
+      });
+    });
+
+    root.querySelectorAll('[data-profile-must-have]').forEach(input => {
+      input.addEventListener('change', () => {
+        state.apartmentProfile.mustHaves[input.getAttribute('data-profile-must-have')] = input.checked;
+        AppEngine.saveState(state);
+      });
+    });
+
+    root.querySelectorAll('[data-profile-preference]').forEach(input => {
+      input.addEventListener('change', () => {
+        state.apartmentProfile.preferences[input.getAttribute('data-profile-preference')] = input.checked;
+        AppEngine.saveState(state);
+      });
+    });
+
+    root.querySelectorAll('[data-profile-preference-number]').forEach(input => {
+      input.addEventListener('change', () => {
+        const value = parseInt(input.value, 10);
+        if (!Number.isFinite(value) || value <= 0) return;
+        state.apartmentProfile.preferences[input.getAttribute('data-profile-preference-number')] = value;
+        AppEngine.saveState(state);
+      });
+    });
+
+    root.querySelectorAll('[data-profile-text]').forEach(input => {
+      input.addEventListener('change', () => {
+        state.apartmentProfile[input.getAttribute('data-profile-text')] = input.value;
+        AppEngine.saveState(state);
+      });
+    });
 
     const neighborhoodAdd = root.querySelector('#mt-neighborhood-add');
     if (neighborhoodAdd) {

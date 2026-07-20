@@ -975,6 +975,20 @@ body {
 .mt-chip-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .mt-chip { display: inline-flex; gap: 6px; align-items: center; background: rgba(0,122,255,0.08); color: var(--accent-primary); border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 800; }
 .mt-chip button { border: none; background: transparent; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: 0 0 1px 2px; }
+.mt-apartment-profile { margin-bottom: 18px; }
+.mt-profile-space-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+.mt-profile-space-grid fieldset { border: 1px solid var(--border-color); border-radius: 10px; padding: 10px; min-width: 0; }
+.mt-profile-space-grid legend { font-size: 12px; font-weight: 800; padding: 0 5px; }
+.mt-profile-space-grid label { display: grid; grid-template-columns: 1fr 72px; align-items: center; gap: 6px; font-size: 12px; margin-top: 6px; }
+.mt-profile-space-grid input { width: 100%; padding: 7px; border: 1px solid var(--border-color); border-radius: 7px; box-sizing: border-box; }
+.mt-profile-must-haves { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.mt-profile-must-haves label { background: rgba(0,122,255,0.08); border-radius: 999px; padding: 7px 10px; font-size: 12px; font-weight: 700; }
+.mt-profile-preferences { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; padding-top: 10px; border-top: 1px solid var(--border-color); }
+.mt-profile-preferences label { background: rgba(52,199,89,0.1); border-radius: 999px; padding: 7px 10px; font-size: 12px; font-weight: 700; }
+.mt-profile-preferences .mt-profile-lease { background: rgba(255,59,48,0.09); }
+.mt-profile-lease input { width: 52px; padding: 3px 5px; border: 1px solid var(--border-color); border-radius: 6px; }
+.mt-profile-preferences input[type="number"] { width: 64px; padding: 3px 5px; border: 1px solid var(--border-color); border-radius: 6px; }
+@media (max-width: 720px) { .mt-profile-space-grid { grid-template-columns: 1fr; } }
 .mt-filter-chip.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
 .mt-two-col-form, .mt-util-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .mt-two-col-form label, .mt-util-fields label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }

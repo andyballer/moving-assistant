@@ -254,6 +254,69 @@ test('default state has the expected core shape', () => {
   assert.deepEqual(Object.keys(state.rooms), sameRealm(MovingApp.ROOMS));
   assert.equal(Array.isArray(state.apartments), true);
   assert.equal(Array.isArray(state.boxes), true);
+  assert.equal(state.targetBudgetMax, '4500');
+  assert.equal(state.apartmentProfile.currentSpace.livingKitchenWidthIn, 225);
+  assert.equal(state.apartmentProfile.mustHaves.dishwasher, true);
+  assert.equal(state.apartmentProfile.preferences.laundryInBuilding, true);
+  assert.equal(state.apartmentProfile.preferences.preferNoInUnitLaundry, true);
+  assert.equal(state.apartmentProfile.preferences.maxLeaseMonths, 12);
+  assert.equal(state.apartmentProfile.preferences.comfortableBudgetMax, 4250);
+  assert.equal(state.apartmentProfile.preferences.stretchBudgetMax, 4500);
+});
+
+test('schema 16 marks University Place rejected for its two-year lease', () => {
+  const MovingApp = loadStateModule();
+  const prior = {
+    schemaVersion: 15,
+    apartmentProfile: MovingApp.defaultApartmentProfile(),
+    apartments: [{
+      name: '1 University Place #7G', status: 'Viewed',
+      links: ['https://streeteasy.com/building/1-university-place-new_york/7g'], notes: 'Old notes'
+    }]
+  };
+  const state = MovingApp.sanitizeState(prior);
+  assert.equal(state.apartments[0].status, 'Rejected');
+  assert.match(state.apartments[0].notes, /two-year lease/);
+});
+
+test('schema 18 makes the stretch budget exceptional-only', () => {
+  const MovingApp = loadStateModule();
+  const profile = MovingApp.defaultApartmentProfile();
+  profile.preferenceNotes = profile.preferenceNotes.replace(
+    '$4,250 is the comfortable target. Going as high as $4,500 is exceptional-only: the apartment must truly blow me away through some combination of location, beauty, light, space, layout, and amenities—not merely qualify on paper.',
+    '$4,250 is the comfortable target, but up to $4,500 is acceptable when the apartment earns the premium.'
+  );
+  const state = MovingApp.sanitizeState({ schemaVersion: 17, apartmentProfile: profile });
+  assert.match(state.apartmentProfile.preferenceNotes, /exceptional-only/);
+  assert.match(state.apartmentProfile.preferenceNotes, /truly blow me away/);
+});
+
+test('apartment profile keeps valid feedback and fills missing fit requirements', () => {
+  const MovingApp = loadStateModule();
+  const state = MovingApp.sanitizeState({
+    apartmentProfile: {
+      currentSpace: { bedroomWidthIn: 96 },
+      mustHaves: { dishwasher: false },
+      learnedSignals: 'Loved the southern exposure.'
+    }
+  });
+  assert.equal(state.apartmentProfile.currentSpace.bedroomWidthIn, 96);
+  assert.equal(state.apartmentProfile.currentSpace.bedroomLengthIn, 120);
+  assert.equal(state.apartmentProfile.mustHaves.dishwasher, false);
+  assert.equal(state.apartmentProfile.mustHaves.queenBed, true);
+  assert.equal(state.apartmentProfile.learnedSignals, 'Loved the southern exposure.');
+});
+
+test('schema 15 migration adds the University Place preference reference once', () => {
+  const MovingApp = loadStateModule();
+  const first = MovingApp.sanitizeState({ schemaVersion: 14, apartments: [] });
+  assert.equal(first.apartments.length, 1);
+  assert.equal(first.apartments[0].name, '1 University Place #7G');
+  assert.equal(first.apartments[0].favorite, true);
+  assert.match(first.apartments[0].notes, /dishwasher/);
+
+  const second = MovingApp.sanitizeState(first);
+  assert.equal(second.apartments.length, 1);
 });
 
 test('sanitizeState migrates older apartment and box data', () => {
@@ -276,9 +339,10 @@ test('sanitizeState migrates older apartment and box data', () => {
   assert.equal(sanitized.activeTab, 'rooms');
   assert.equal(sanitized.aptSize, '1br');
   assert.equal('city' in sanitized, false);
-  assert.deepEqual(sameRealm(sanitized.neighborhoods), ['Gramercy', 'Flatiron']);
+  assert.deepEqual(sameRealm(sanitized.neighborhoods), ['Gramercy', 'Flatiron', 'East Village', 'Union Square']);
   assert.deepEqual(sameRealm(sanitized.apartments[0].links), ['https://example.com/listing']);
   assert.equal(sanitized.apartments[0].status, 'Viewed');
+  assert.equal(sanitized.apartments[1].name, '1 University Place #7G');
   assert.deepEqual(sameRealm(sanitized.boxes[0].contents), ['mugs', 'plates']);
   assert.equal(sanitized.boxes[0].status, 'packed');
   assert.equal(sanitized.boxes[0].source, '');
@@ -787,7 +851,7 @@ test('backup payload summary rejects random JSON and summarizes likely backups',
     userName: 'Andy',
     targetMoveDate: '2026-09-01',
     aptSize: '1br',
-    apartments: 1,
+    apartments: 2,
     boxes: 1,
     checkedItems: 2,
     packedRooms: 1,

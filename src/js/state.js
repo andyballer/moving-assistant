@@ -13,7 +13,7 @@ window.MovingApp.LEGACY_STORAGE_KEYS = [
   'move-tracker:state:v2',
   'move-tracker:state:v1'
 ];
-window.MovingApp.SCHEMA_VERSION = 13;
+window.MovingApp.SCHEMA_VERSION = 18;
 
 window.MovingApp.DONATION_CATEGORIES = ['Books', 'Games', 'Clothes', 'Electronics', 'Other'];
 window.MovingApp.ROOMS = ['Kitchen', 'Bedroom', 'Bathroom', 'Closet', 'Living Room', 'Entryway/Storage'];
@@ -427,7 +427,60 @@ window.MovingApp.APT_OUTREACH_GUIDE = {
   phoneScript: `Hi, I am calling about [Apartment Address]. Is it still available?\n\nIf yes: Great. What is the earliest showing slot? I am ready with documents and can move quickly if it is a fit.\n\nIf unavailable: Thanks for letting me know. Do you have anything similar in [neighborhoods], around [budget], for [move date]?`
 };
 
-window.MovingApp.DEFAULT_NEIGHBORHOODS = ['Gramercy', 'Flatiron', 'Murray Hill'];
+window.MovingApp.DEFAULT_NEIGHBORHOODS = ['East Village', 'Union Square'];
+
+window.MovingApp.defaultApartmentProfile = function() {
+  return {
+    currentSpace: {
+      bedroomWidthIn: 90,
+      bedroomLengthIn: 120,
+      livingKitchenWidthIn: 225,
+      livingKitchenLengthIn: 144,
+      livingOnlyWidthIn: 112,
+      livingOnlyLengthIn: 144
+    },
+    mustHaves: {
+      fullKitchen: true,
+      dishwasher: true,
+      queenBed: true,
+      smallDesk: true,
+      smallDiningTable: true,
+      coffeeTable: true,
+      lShapeCouch: true,
+      tv: true,
+      coatShoeLanding: true
+    },
+    preferences: {
+      laundryInBuilding: true,
+      preferNoInUnitLaundry: true,
+      maxLeaseMonths: 12,
+      comfortableBudgetMax: 4250,
+      stretchBudgetMax: 4500
+    },
+    preferenceNotes: 'Prioritize East Village / Union Square access. $4,250 is the comfortable target. Going as high as $4,500 is exceptional-only: the apartment must truly blow me away through some combination of location, beauty, light, space, layout, and amenities—not merely qualify on paper. A beautiful apartment in an exceptional location can justify being a little smaller, but it should offer similar or greater usable space than the current studio. Natural light matters. Laundry in the building is strongly preferred; in-unit laundry is not desirable. A required lease longer than 12 months is a dealbreaker.',
+    learnedSignals: 'Strong positive: beautiful prewar character, park proximity, doorman/elevator, excellent storage, and a separate renovated kitchen. Tradeoffs tolerated: slightly small when the location and character are exceptional. Negative: limited natural light is noticeable and matters. Judge space by the usable main-room dimensions and complete furniture layout—not advertised total square footage that includes the foyer, kitchen, bath, or balcony. A studio that cannot hold the queen bed, full couch/TV/coffee-table zone, and desk is too small even at 400 advertised sq ft. Reject otherwise appealing listings when they require a two-year lease.'
+  };
+};
+
+window.MovingApp.UNIVERSITY_PLACE_REFERENCE = {
+  name: '1 University Place #7G',
+  price: '4095',
+  minRent: '',
+  maxRent: '4250',
+  status: 'Rejected',
+  links: ['https://streeteasy.com/building/1-university-place-new_york/7g'],
+  favorite: true,
+  image: 'https://photos.zillowstatic.com/fp/c5332670b524cbded59bc42c29d3aca6-se_extra_large_1500_800.webp',
+  imageStatus: 'auto',
+  realtorName: 'Leonard Bromberg · Balen Real Estate, LLC',
+  lastContactDate: '',
+  viewedDate: '',
+  followUpDate: '',
+  applicationDueDate: '',
+  cashierCheckNeeded: false,
+  cashierCheckBy: '',
+  notes: 'REJECTED — mandatory two-year lease is a dealbreaker. Keep as a taste reference. $4,095 base rent; studio; available 7/21/2026. Confirmed: separate windowed full kitchen, refrigerator, dishwasher, 3 closets (2 walk-in), doorman, elevator, and 9-foot ceilings. Floor plan: main studio 14′2″ × 18′9″ (~266 sq ft) plus kitchen 5′6″ × 8′10″ (~49 sq ft), roughly 315 measured sq ft before bath/closets/hall. Fit: queen bed, TV, coffee table, and couch should work; an L-shaped couch plus desk and dining table needs an exact furniture-layout check. Loved: beautiful prewar character and immediate Washington Square Park location. Drawbacks: felt a little small and the main window received limited natural light. Listing photos appear staged, so do not use their furniture scale as proof of fit.'
+};
 
 window.MovingApp.SUPPLIES = [
   { name: 'Tape Gun & Dispensers', store: 'Target, Staples, or U-Haul' },
@@ -561,7 +614,8 @@ window.MovingApp.defaultState = function() {
     },
     neighborhoods: [...window.MovingApp.DEFAULT_NEIGHBORHOODS],
     targetBudgetMin: '',
-    targetBudgetMax: '',
+    targetBudgetMax: '4500',
+    apartmentProfile: window.MovingApp.defaultApartmentProfile(),
     checked: {},
     donations: window.MovingApp.DONATION_CATEGORIES.reduce((acc, c) => ({ ...acc, [c]: [] }), {}),
     movers: window.MovingApp.MOVERS.reduce((acc, m) => ({ ...acc, [m.name]: false }), {}),
@@ -644,8 +698,38 @@ window.MovingApp.sanitizeState = function(input) {
   merged.neighborhoods = Array.isArray(input.neighborhoods)
     ? input.neighborhoods.map(String).map(x => x.trim()).filter(Boolean).slice(0, 12)
     : [...window.MovingApp.DEFAULT_NEIGHBORHOODS];
+  if (!input.apartmentProfile) {
+    ['East Village', 'Union Square'].forEach(neighborhood => {
+      if (!merged.neighborhoods.some(item => item.toLowerCase() === neighborhood.toLowerCase())) merged.neighborhoods.push(neighborhood);
+    });
+  }
   merged.targetBudgetMin = input.targetBudgetMin || '';
-  merged.targetBudgetMax = input.targetBudgetMax || '';
+  merged.targetBudgetMax = input.targetBudgetMax || base.targetBudgetMax;
+  const defaultApartmentProfile = window.MovingApp.defaultApartmentProfile();
+  const apartmentProfile = input.apartmentProfile && typeof input.apartmentProfile === 'object' && !Array.isArray(input.apartmentProfile) ? input.apartmentProfile : {};
+  const currentSpace = apartmentProfile.currentSpace && typeof apartmentProfile.currentSpace === 'object' ? apartmentProfile.currentSpace : {};
+  const mustHaves = apartmentProfile.mustHaves && typeof apartmentProfile.mustHaves === 'object' ? apartmentProfile.mustHaves : {};
+  const preferences = apartmentProfile.preferences && typeof apartmentProfile.preferences === 'object' ? apartmentProfile.preferences : {};
+  merged.apartmentProfile = {
+    currentSpace: Object.keys(defaultApartmentProfile.currentSpace).reduce((acc, key) => {
+      const value = parseFloat(currentSpace[key]);
+      acc[key] = Number.isFinite(value) && value > 0 ? value : defaultApartmentProfile.currentSpace[key];
+      return acc;
+    }, {}),
+    mustHaves: Object.keys(defaultApartmentProfile.mustHaves).reduce((acc, key) => {
+      acc[key] = typeof mustHaves[key] === 'boolean' ? mustHaves[key] : defaultApartmentProfile.mustHaves[key];
+      return acc;
+    }, {}),
+    preferences: {
+      laundryInBuilding: typeof preferences.laundryInBuilding === 'boolean' ? preferences.laundryInBuilding : defaultApartmentProfile.preferences.laundryInBuilding,
+      preferNoInUnitLaundry: typeof preferences.preferNoInUnitLaundry === 'boolean' ? preferences.preferNoInUnitLaundry : defaultApartmentProfile.preferences.preferNoInUnitLaundry,
+      maxLeaseMonths: Number.isFinite(parseInt(preferences.maxLeaseMonths, 10)) && parseInt(preferences.maxLeaseMonths, 10) > 0 ? parseInt(preferences.maxLeaseMonths, 10) : defaultApartmentProfile.preferences.maxLeaseMonths,
+      comfortableBudgetMax: Number.isFinite(parseInt(preferences.comfortableBudgetMax, 10)) ? parseInt(preferences.comfortableBudgetMax, 10) : defaultApartmentProfile.preferences.comfortableBudgetMax,
+      stretchBudgetMax: Number.isFinite(parseInt(preferences.stretchBudgetMax, 10)) ? parseInt(preferences.stretchBudgetMax, 10) : defaultApartmentProfile.preferences.stretchBudgetMax
+    },
+    preferenceNotes: typeof apartmentProfile.preferenceNotes === 'string' ? apartmentProfile.preferenceNotes : defaultApartmentProfile.preferenceNotes,
+    learnedSignals: typeof apartmentProfile.learnedSignals === 'string' ? apartmentProfile.learnedSignals : defaultApartmentProfile.learnedSignals
+  };
   delete merged.annualIncome;
   merged.checked = (input.checked && typeof input.checked === 'object' && !Array.isArray(input.checked)) ? input.checked : {};
   merged.donations = window.MovingApp.DONATION_CATEGORIES.reduce((acc, cat) => {
@@ -654,6 +738,31 @@ window.MovingApp.sanitizeState = function(input) {
     return acc;
   }, {});
   merged.apartments = window.MovingApp.migrateApartments(input.apartments);
+  if ((parseInt(input.schemaVersion, 10) || 0) < 15) {
+    const referenceUrl = window.MovingApp.UNIVERSITY_PLACE_REFERENCE.links[0];
+    const alreadySaved = merged.apartments.some(apartment => (apartment.links || []).some(link => String(link).split('?')[0] === referenceUrl));
+    if (!alreadySaved) merged.apartments.push({ ...window.MovingApp.UNIVERSITY_PLACE_REFERENCE });
+  }
+  if ((parseInt(input.schemaVersion, 10) || 0) < 16) {
+    const referenceUrl = window.MovingApp.UNIVERSITY_PLACE_REFERENCE.links[0];
+    const reference = merged.apartments.find(apartment => (apartment.links || []).some(link => String(link).split('?')[0] === referenceUrl));
+    if (reference) {
+      reference.status = 'Rejected';
+      reference.notes = window.MovingApp.UNIVERSITY_PLACE_REFERENCE.notes;
+    }
+  }
+  if ((parseInt(input.schemaVersion, 10) || 0) < 17 && (!input.targetBudgetMax || String(input.targetBudgetMax) === '4250')) {
+    merged.targetBudgetMax = '4500';
+  }
+  if ((parseInt(input.schemaVersion, 10) || 0) < 18) {
+    const oldBudgetPhrase = '$4,250 is the comfortable target, but up to $4,500 is acceptable when the apartment earns the premium.';
+    const exceptionalBudgetPhrase = '$4,250 is the comfortable target. Going as high as $4,500 is exceptional-only: the apartment must truly blow me away through some combination of location, beauty, light, space, layout, and amenities—not merely qualify on paper.';
+    if (!merged.apartmentProfile.preferenceNotes.includes(exceptionalBudgetPhrase)) {
+      merged.apartmentProfile.preferenceNotes = merged.apartmentProfile.preferenceNotes.includes(oldBudgetPhrase)
+        ? merged.apartmentProfile.preferenceNotes.replace(oldBudgetPhrase, exceptionalBudgetPhrase)
+        : `${exceptionalBudgetPhrase} ${merged.apartmentProfile.preferenceNotes}`.trim();
+    }
+  }
   merged.aptFilter = ['all', 'favorites', 'followup'].includes(input.aptFilter) ? input.aptFilter : 'all';
   merged.customMovers = Array.isArray(input.customMovers) ? input.customMovers.map(m => {
     const quote = parseFloat(m.quoteAmount);
